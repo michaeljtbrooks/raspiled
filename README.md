@@ -44,7 +44,7 @@ Here's the circuit I used:
 
 ![Raspiled circuit](https://github.com/michaeljtbrooks/raspiled/blob/master/docs/Raspiled_breakout_circuit.png)
 
-For clarity, the way the SMD5050 LED strips work is that they take a common 12V power in, and you connect the relevant colour channel to GROUND to switch the LED on. So the pad marked + on the strip goes to 12V. The pads marked R/G/B  Don't try to stick 12V into the R / G / B contact pads on the LED strip, it won't like it.
+For clarity, the way the SMD5050 LED strips work is that they take a common 12V power in, and you connect the relevant colour channel to GROUND to switch the LED on. So the pad marked + on the strip goes to 12V. The pads marked R/G/B go to ground via our MOSFETs. Don't try to stick 12V into the R / G / B contact pads on the LED strip, it won't like it.
 
 ##### Optional stuff #####
 The LED strips take 12V, but the Raspberry Pi is driven by 5V. I didn't want to muck about with two different "wall wart" power supplies, so I bought a little 12V DC to 5V DC buck converter, and used the output of that to power the Raspberry Pi. Btw you CAN power the Raspberry Pi by pumping 5V into its 5V pin, just be aware that this bypasses the thermal fuse. I made sure my 12V power supply was high quality.
