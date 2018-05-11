@@ -2,6 +2,8 @@
 
 Raspberry Pi driven RGB LED strips
 
+![Raspiled Web Interface](https://github.com/michaeljtbrooks/raspiled/blob/master/docs/Raspiled_web_interface.png)
+
 ### What is this? ###
 RaspiLED is a Python based controller for LED strips. It allows you to drive full-colour (RGB) LED strip from a Raspberry Pi, via a very easy to use touch-friendly web interface.
 
