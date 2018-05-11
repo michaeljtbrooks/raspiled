@@ -53,7 +53,10 @@ You don't need a heatsink for the MOSFETs, unless your house happens to be hotte
 
 
 ### Software Installation ###
-1. Get Raspian or Ubuntu running on your Raspberry Pi, with network connectivity working
+1. Get Raspian or Ubuntu running on your Raspberry Pi, with network connectivity working, and install essential packages:
+```bash
+sudo apt-get install build-essential unzip wget git
+```
 2. Install pigpio (see http://abyz.me.uk/rpi/pigpio/download.html)
 ```bash
 wget https://github.com/joan2937/pigpio/archive/master.zip
@@ -66,7 +69,7 @@ sudo make install
 4. SSH into your Raspberry Pi. Change to the directory where you saved this repo
 5. Install python virtual environments
 ```bash
-sudo apt-get install python-pip
+sudo apt-get install python-pip 
 sudo pip install virtualenv
 ```
 6. Create a virtual environment to run Raspiled in, and activate it
@@ -83,11 +86,16 @@ pip install -r ./src/requirements.txt
 ifconfig
 ```
 9. Modify ./src/ledstrip.py so that the constants for the Pins match the GPIO pins you have connected the LED colour channels to.
-10. Run the Raspiled server:
+10. Run the Pigpiod daemon:
+```bash
+sudo pigpiod
+```
+
+11. Run the Raspiled server:
 ```bash
 python ./src/raspiled_listener.py
 ```
-11. On your smartphone / another computer on the same local network, open your web browser and head to: http://<your.raspberry.pi.ip>:9090
+12. On your smartphone / another computer on the same local network, open your web browser and head to: http://<your.raspberry.pi.ip>:9090
 
 ##### Optional stuff #####
 If you want the Raspberry Pi to boot up and automatically run Raspiled
