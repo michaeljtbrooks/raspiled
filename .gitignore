@@ -1,0 +1,13 @@
+/bin
+/include
+/lib
+/local
+/share
+
+*.conf
+*.config
+*.out
+*.json
+*.txt
+*.pyc
+*.swp
