@@ -74,7 +74,7 @@ def pigpiod_process():
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
     else:
-        logging.info('PIGPIOD is running! Process number: %s' % output.split('\n')[0]) 
+        logging.info('PIGPIOD is running! PID: %s' % output.split('\n')[0]) 
 
 pigpiod_process()
 
