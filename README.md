@@ -87,17 +87,17 @@ pip install -r ./src/requirements.txt
 ```bash
 ifconfig
 ```
-9. Modify ./src/ledstrip.py so that the constants for the Pins match the GPIO pins you have connected the LED colour channels to.
-9. Modify ./src/raspiled_listener.py and change PI_HOST to "localhost". PI_PORT should be left as 8888 as this is what Pigpiod is configured to use.
-10. Run the Pigpiod daemon:
+9. Copy ./src/raspiled.conf.TEMPLATE to ./src/raspiled.conf so Raspiled knows what settings to use.
+10. Modify ./src/raspiled.conf: change the constants for the Pins match the GPIO pins you have connected the LED colour channels to, and change PI_HOST to "localhost". PI_PORT should be left as 8888 as this is what Pigpiod is configured to use.
+11. Run the Pigpiod daemon:
 ```bash
 sudo pigpiod
 ```
-11. Run the Raspiled server:
+12. Run the Raspiled server:
 ```bash
 python ./src/raspiled_listener.py
 ```
-12. On your smartphone / another computer on the same local network, open your web browser and head to: http://<your.raspberry.pi.ip>:9090 e.g. http://192.168.0.33:9090 in my case
+13. On your smartphone / another computer on the same local network, open your web browser and head to: http://<your.raspberry.pi.ip>:9090 e.g. http://192.168.0.33:9090 in my case
 
 ##### Optional stuff #####
 If you want the Raspberry Pi to boot up and automatically run Raspiled, you can add this command to /etc/rc.local:
@@ -130,3 +130,6 @@ Here are some ideas for improvements:
 * Holiday mode: turn the lights on for several minutes then off to deter burglars
 
 
+#### With thanks to ####
+* David Ordnung for his [amazing tutorial on driving LED strips from the GPIO pins](https://dordnung.de/raspberrypi-ledstrip/)
+* Josue-Martinez-Moreno for contributing better logging, the config file architecture and other very good ideas
