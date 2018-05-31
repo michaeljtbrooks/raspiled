@@ -1,0 +1,7 @@
+[DEFAULT]
+config_path = RASPILED_DIR+'/raspiled.conf'
+pi_port = 8888
+pi_host = localhost
+blue_pin = 24
+green_pin = 22
+red_pin = 17
