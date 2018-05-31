@@ -11,9 +11,9 @@
 """
 
 from __future__ import unicode_literals
+from utils import *
 from ledstrip import LEDStrip
 import os
-from pprint import pprint
 from subprocess import check_output, CalledProcessError
 import time
 from twisted.internet import reactor, endpoints
@@ -23,6 +23,9 @@ from twisted.web.static import File
 import json
 from named_colours import NAMED_COLOURS
 import copy
+import logging
+import configparser
+
 try:
     #python2
     from urllib import urlencode
@@ -31,24 +34,58 @@ except ImportError:
     from urllib.parse import urlencode
 
 
+APP_NAME="python ./raspiled_listener.py"
+
+logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
+                            datefmt='%H:%M:%S',level=logging.INFO)
 
 RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
 
-APP_NAME="python ./raspiled_listener.py"
+DEFAULTS = {
+        'config_path' : RASPILED_DIR,
+        'pi_host'     : 'localhost',
+        'pi_port'     : 8888,
+        'red_pin'     : '',
+        'green_pin'   : '',
+        'blue_pin'    : ''
+            }
 
-PI_HOST = "192.168.0.33"
-PI_PORT = 8888
+config_path = os.path.expanduser(RASPILED_DIR+'/raspiled.conf')
+parser = configparser.ConfigParser(defaults=DEFAULTS)
 
+if os.path.exists(config_path):
+    logging.info('Using config file: {}'.format(config_path))
+    parser.read(config_path)
+else:
+    logging.warn('No config file found. Creating default {} file.'.format(config_path))
+    logging.warn('*** Please edit this file as needed. ***')
+    
+    while True:
+        try:
+            DEFAULTS['red_pin']=input('RED pin number:')
+            DEFAULTS['green_pin']=input('GREEN pin number:')
+            DEFAULTS['blue_pin']=input('BLUE pin number:')
 
+            if (DEFAULTS['red_pin']==DEFAULTS['blue_pin'] 
+	      or DEFAULTS['red_pin']==DEFAULTS['green_pin'] 
+	      or DEFAULTS['green_pin']==DEFAULTS['blue_pin']):
+	        logging.warn('*** The pin number should be different for all pins. ***')
+	    else:
+	        logging.info('Configuration Finished.')
+	        break
+        except:
+	    logging.warn('*** The input should be an integer ***')
+    parser = configparser.ConfigParser(defaults=DEFAULTS)
+    with open(config_path, 'w') as f:
+        parser.write(f)
+
+params = Odict2int(parser.defaults())
 
 DEBUG = True
 
-
-
-
 def D(item):
     if DEBUG:
-        pprint(item)
+        logging.info(item)
 
 
 class Preset(object):
@@ -267,7 +304,7 @@ class RaspiledControlResource(Resource):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
-        self.led_strip = LEDStrip(pi_host=PI_HOST, pi_port=PI_PORT)
+        self.led_strip = LEDStrip(params)
         Resource.__init__(self, *args, **kwargs) #Super
         #Add in the static folder
         static_folder = os.path.join(RASPILED_DIR,"static")
@@ -395,7 +432,7 @@ class RaspiledControlResource(Resource):
         Run when user wants to set a colour to a specified value
         """
         set_colour = request.get_param("set", force=unicode)
-        print("Set to: %s" % set_colour)
+        D("Set to: %s" % set_colour)
         return self.led_strip.set(set_colour)
     
     def action__fade(self, request):
@@ -403,7 +440,7 @@ class RaspiledControlResource(Resource):
         Run when user wants to set a colour to a specified value
         """
         fade_colour = request.get_param("fade", force=unicode)
-        print("Fade to: %s" % fade_colour)
+        logging.info("Fade to: %s" % fade_colour)
         return self.led_strip.fade(fade_colour)
     
     def action__sunrise(self, request):
@@ -412,7 +449,7 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        print("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
+        logging.info("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds)
     
     def action__sunset(self, request):
@@ -421,7 +458,7 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        print("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
+        logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds)
     
     def action__jump(self, request):
@@ -433,7 +470,7 @@ class RaspiledControlResource(Resource):
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         self.led_strip.stop_current_sequence() #Terminate any crap that's going on
         total_seconds = (seconds + (milliseconds/1000.0))
-        print("Jump: %s, %s seconds" % (jump_colours, total_seconds))
+        logging.info("Jump: %s, %s seconds" % (jump_colours, total_seconds))
         return self.led_strip.jump(jump_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
     
     def action__rotate(self, request):
@@ -445,7 +482,7 @@ class RaspiledControlResource(Resource):
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         self.led_strip.stop_current_sequence() #Terminate any crap that's going on
         total_seconds = (seconds + (milliseconds/1000.0))
-        print("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
+        logging.info("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
         return self.led_strip.rotate(rotate_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
     
     def action__stop(self, request):
@@ -458,7 +495,7 @@ class RaspiledControlResource(Resource):
         """
         Turns the strip off
         """
-        print("Off!")
+        logging.info("Off!")
         return self.led_strip.off()
     
     def teardown(self):
@@ -601,15 +638,14 @@ def start_if_not_running():
     pids = get_matching_pids(APP_NAME, exclude_self=True) #Will remove own PID
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
-        print("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
+        logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
         #resource = RaspiledControlSite()
         factory = RaspiledControlSite(timeout=8) #8s timeout
         endpoint = endpoints.TCP4ServerEndpoint(reactor, 9090)
         endpoint.listen(factory)
         reactor.run()
     else:
-        print("Raspiled Listener already running with PID %s" % ", ".join(pids))
-        
+        logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
         
 if __name__=="__main__":
     start_if_not_running()

@@ -20,6 +20,11 @@ import re
 import time
 from time import sleep
 import threading
+import subprocess
+import logging
+
+logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
+                            datefmt='%H:%M:%S',level=logging.INFO)
 
 #Python version safe importing of HTML parser
 try:
@@ -38,9 +43,6 @@ except ImportError:
 
 ##### Constants #####
 
-RED_PIN = 27
-GREEN_PIN = 17
-BLUE_PIN = 22
 NO_CALIBRATION = {  #RGB multipliers when var -> light
     "r" : 1.0,
     "g" : 1.0,
@@ -60,9 +62,21 @@ PWM_MIN = 0.0
 
 
 #pigpio_interface = pigpio.pi("192.168.0.33",8888) #We use ONE class instance
+def pigpiod_process():
+    cmd='pgrep pigpiod'
 
+    process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+    output, error = process.communicate()
 
-#TODO: First check if pigpio process is running??
+    if output=='':
+        logging.warn('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***') 
+        cmd='sudo pigpiod'
+        process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
+        output, error = process.communicate()
+    else:
+        logging.info('PIGPIOD is running! PID: %s' % output.split('\n')[0]) 
+
+pigpiod_process()
 
 class PiPinInterface(pigpio.pi, object):
     """
@@ -71,15 +85,9 @@ class PiPinInterface(pigpio.pi, object):
     
     Create a new instance for every Raspberry Pi you wish to connect to. Normally we'll stick with one (localhost)
     """
-    DEFAULT_HOST = "localhost"
-    DEFAULT_PORT = 8888
     
-    def __init__(self, ipv4=None, port=None):
-        if ipv4 is None:
-            ipv4 = self.DEFAULT_HOST
-        if port is None:
-            port = self.DEFAULT_PORT
-        super(PiPinInterface, self).__init__(ipv4, port)
+    def __init__(self, params):
+        super(PiPinInterface, self).__init__(params['pi_host'], params['pi_port'])
     
     def __unicode__(self):
         """
@@ -102,15 +110,12 @@ class LEDStrip(object):
     r = 0.0 #Current value of red channel
     g = 0.0 #Current value of green channel
     b = 0.0 #Current value of blue channel
-    _red_pin = RED_PIN
-    _green_pin = GREEN_PIN
-    _blue_pin = BLUE_PIN
     colour = (0,0,0) #Tuple expressing the current colour (0-255)
     iface = None
     _sequence = None #The current sequence we are running
     _sequence_stop_signal = False #Whether to stop a sequence or not
     
-    def __init__(self, red_pin=RED_PIN, green_pin=GREEN_PIN, blue_pin=BLUE_PIN, calibrate=None, interface=None, pi_host=None, pi_port=None):
+    def __init__(self, params, calibrate=None, interface=None):
         """
         Initialises the lights
         
@@ -131,15 +136,15 @@ class LEDStrip(object):
                 iface_host = None
             if iface_host is None:
                 need_to_generate_new_interface = True
-                print("No existing iface host")
+                logging.info("No existing iface host")
             elif pi_host and unicode(pi_host) != unicode(iface_host):
                 need_to_generate_new_interface = True
-                print("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
+                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
             try:
                 iface_port = interface._port
             except AttributeError:
                 iface_port = None
-                print("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pi_port))
+                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pi_port))
             if iface_port is None:
                 need_to_generate_new_interface = True
             elif pi_port and unicode(pi_port) != unicode(iface_port):
@@ -149,10 +154,10 @@ class LEDStrip(object):
             except AttributeError:
                 iface_connected = False
             if not iface_connected:
-                print("iface not connected!")
+                logging.info("iface not connected!")
                 need_to_generate_new_interface = True
         if need_to_generate_new_interface:
-            self.iface = self.generate_new_interface(pi_host, pi_port)
+            self.iface = self.generate_new_interface(params)
         else:
             self.iface = interface
         
@@ -160,9 +165,13 @@ class LEDStrip(object):
         if calibrate is None:
             calibrate = copy.copy(AUTO_CALIBRATE) #Don't pollute global mutable!
         self._calibrate = calibrate #Whether to adjust for differing RGB light intensities (green is brighter)
-        self._red_pin = self.pin_lim(red_pin) 
-        self._green_pin = self.pin_lim(green_pin)
-        self._blue_pin = self.pin_lim(blue_pin)
+        self._red_pin = params['red_pin']
+        self._green_pin = params['green_pin']
+        self._blue_pin = params['blue_pin']
+        
+        #self._red_pin = self.pin_lim(red_pin) 
+        #self._green_pin = self.pin_lim(green_pin)
+        #self._blue_pin = self.pin_lim(blue_pin)
         
         #Initialise strip... it may already be alive!
         self.sync_channels() #Sets internal channels to match the values of the actual pins
@@ -185,10 +194,10 @@ class LEDStrip(object):
         #Test values
         try:
             if value < lower:
-                print("WARNING - LEDStrip.lim(): Value %s is less than lower limit %s. Setting to %s." % (value, lower, less_than_lower_default))
+                logging.warn(" LEDStrip.lim(): Value %s is less than lower limit %s. Setting to %s." % (value, lower, less_than_lower_default))
                 return float(less_than_lower_default)
             if value > upper:
-                print("WARNING - LEDStrip.lim(): Value %s is greater than upper limit %s. Setting to %s" % (value, upper, greater_than_upper_default))
+                logging.warn(" LEDStrip.lim(): Value %s is greater than upper limit %s. Setting to %s" % (value, upper, greater_than_upper_default))
                 return float(greater_than_upper_default)
         except (ValueError, TypeError, AttributeError):
             return float(less_than_lower_default)
@@ -280,7 +289,7 @@ class LEDStrip(object):
             lum = float(0.2126*pow(r/div, 2.2)) + float(0.7152*pow(g/div, 2.2)) + float(0.0722*pow(b/div, 2.2))
         except (TypeError, ValueError):
             return dark_default
-        #print ("Luminosity: %s" % lum)
+        #logging.info ("Luminosity: %s" % lum)
         #Decision gate:
         if lum >= trigger: #Light background, need dark text
             return "%s%s" % (hashed, dark_default)
@@ -418,7 +427,7 @@ class LEDStrip(object):
         r, g, b = self.rgb
         return self.rgb_to_hex(r, g, b)
     
-    def generate_new_interface(self, host, port):
+    def generate_new_interface(self, params):
         """
         Builds a new interface, stores it in self.iface
         """
@@ -427,7 +436,7 @@ class LEDStrip(object):
             self.iface.stop()
         except (AttributeError, IOError):
             pass
-        self.iface = PiPinInterface(host, port)
+        self.iface = PiPinInterface(params)
         return self.iface
     
     def set_led(self, pin, value=0):
@@ -442,9 +451,9 @@ class LEDStrip(object):
             try:
                 self.iface.set_PWM_dutycycle(pin, value)
             except (AttributeError, IOError):
-                print("ERROR: Cannot output to pins. PWM of pin #%s would be %s" % (pin,value))
+                logging.error(" Cannot output to pins. PWM of pin #%s would be %s" % (pin,value))
         else:
-            print("ERROR: Interface not connected. Cannot output to pins. PWM of pin #%s would be %s" % (pin,value))
+            logging.error(" Interface not connected. Cannot output to pins. PWM of pin #%s would be %s" % (pin,value))
         return value
     
     def read_led(self, pin):
@@ -458,9 +467,9 @@ class LEDStrip(object):
             try:
                 value = self.iface.get_PWM_dutycycle(pin)
             except (AttributeError, IOError, pigpio.error):
-                print("ERROR: Cannot read PWM of pin #%s" % (pin,))
+                logging.error(" Cannot read PWM of pin #%s" % (pin,))
         else:
-            print("ERROR: Interface not connected. Cannot read PWM of pin #%s." % (pin,))
+            logging.error(" Interface not connected. Cannot read PWM of pin #%s." % (pin,))
         return value
     
     def read_rgb(self, decalibrate=False):
@@ -599,7 +608,7 @@ class LEDStrip(object):
             g = int(g)
             b = int(b)
         except (ValueError, TypeError):
-            print("WARNING: no colour identified by '%s'. Using current colour." % r)
+            logging.info("WARNING: no colour identified by '%s'. Using current colour." % r)
             return self.rgb
         
         if fade:
@@ -643,7 +652,7 @@ class LEDStrip(object):
         if calibrate is None: #Use auto
             calibrate = copy.copy(AUTO_CALIBRATE)
         self._calibrate = calibrate
-        print("Calibration updated! %s" % self._calibrate)
+        logging.info("Calibration updated! %s" % self._calibrate)
     set_calibration = set_calibrate
     calibrate = set_calibrate
     
@@ -652,7 +661,7 @@ class LEDStrip(object):
         Turns calibration OFF
         """
         self._calibrate = copy.copy(NO_CALIBRATION)
-        print("Calibration off! %s" % self._calibrate)
+        logging.info("Calibration off! %s" % self._calibrate)
     set_calibrate_off = calibrate_off
     set_calibration_off = calibrate_off
     calibration_off = calibrate_off
@@ -708,9 +717,9 @@ class LEDStrip(object):
         """
         Nukes any remaining threads. Called when the parent reactor loop stops
         """
-        print("\tLEDstrip: exiting sequence threads...")
+        logging.info("\tLEDstrip: exiting sequence threads...")
         self.off() #Stops all sequences and fades to black
-        print("\t\t...done")
+        logging.info("\t\t...done")
     
     def _colour_loop(self, colours, seconds=None, milliseconds=None, fade=True):
         """
@@ -774,21 +783,21 @@ class LEDStrip(object):
         
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
         """
-        print("Running sunrise/sunset.... ")
+        logging.info("Running sunrise/sunset.... ")
         if setting:
             temp_0 = 6500
             temp_n = 500
             temp_step = -100
             x_start = 0
             x_step_amount = 1
-            print("Sunsetting...")
+            logging.info("Sunsetting...")
         else:
             temp_0 = 600
             temp_n = 6600
             temp_step = 100
             x_start = 60
             x_step_amount = -1
-            print("Sun rising...")
+            logging.info("Sun rising...")
         
         #Add in a fudge factor to cater for CPU doing other things:
         FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
@@ -810,7 +819,7 @@ class LEDStrip(object):
             check=False
         
         t2 = time.time()
-        print("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
+        logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
     
     def sunset(self, seconds=None, milliseconds=None):
         """
