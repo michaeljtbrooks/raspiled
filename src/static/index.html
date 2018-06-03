@@ -1,0 +1,64 @@
+<html>
+    <head>
+        <title>Raspiled</title>
+        <link rel="stylesheet" id="style" href="/static/css/raspiled.css">
+        <script src="/static/js/iro.min.js"></script>
+        <script src="/static/js/jquery3.min.js"></script>
+        <script src="/static/js/raspiled.js"></script>
+        <script>
+            //Load our colour-picker
+            $(document).ready(function(e){{
+                $.fn.init_colourpicker("{current_hex}");
+            }});
+        </script>
+    </head>
+
+    <body>
+        <div class="menu" id="menu">
+            <ul class="menu_control" id="menu_control">
+                <li></li>
+                <li></li>
+                <li></li>
+            </ul>
+        </div>
+        <div class="menu_content" id="menu_content">
+            <div class="logo">
+                <img src="./static/figs/raspiled.svg">
+            </div>
+            <div class="menu_list" id="menu_list">
+                <div name="light" id="menu_click">Light</div>
+                <div name="alarms" id="menu_click">Alarms</div>
+                <div name="music" id="menu_click">Music</div>
+                <div name="control" id="menu_click">Controls</div>
+            </div>
+            <div id="off_button">{off_preset_html}</div>
+            <div class="info">
+                <div class="logos">
+                    <a href="https://github.com/michaeljtbrooks/raspiled" target="_blank">
+                        <img src="./static/figs/github.svg">
+                    </a>
+                    <a href="http://www.raspberrypi.org" target="_blank">
+                        <img src="./static/figs/raspberry_pi.png">
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="main-menu light" id="light">
+        <h1>Light Control:</h1>
+            <div id="current-colour" class="colour-status" style="background-color: {current_hex}; color: {contrast_colour}">{current_hex} {current_colour}</div>
+            <div id="raspiled-color-picker"></div>
+            {light_html}
+        </div>
+        <div class="main-menu alarms" id="alarms">
+            
+            {alarm_html}
+        </div>
+        <div class="main-menu music" id="music">
+            {music_html}
+        </div>
+        <div class="main-menu control" id="control">
+            {controls_html}
+        </div>
+    </body>
+    <script src="/static/js/web_interaction.js"></script>
+</html>

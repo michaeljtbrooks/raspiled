@@ -16,7 +16,7 @@ from ledstrip import LEDStrip
 import os
 from subprocess import check_output, CalledProcessError
 import time
-from twisted.internet import reactor, endpoints
+from twisted.internet import reactor, endpoints,protocol
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
@@ -25,6 +25,7 @@ from named_colours import NAMED_COLOURS
 import copy
 import logging
 import configparser
+
 
 try:
     #python2
@@ -44,7 +45,8 @@ RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're 
 DEFAULTS = {
         'config_path' : RASPILED_DIR,
         'pi_host'     : 'localhost',
-        'pi_port'     : 8888,
+        'pi_port'     : 9090,
+        'pig_port'    : 8888,
         'red_pin'     : '',
         'green_pin'   : '',
         'blue_pin'    : ''
@@ -81,7 +83,7 @@ else:
 
 params = Odict2int(parser.defaults())
 
-DEBUG = True
+DEBUG = False
 
 def D(item):
     if DEBUG:
@@ -100,7 +102,7 @@ class Preset(object):
     display_colour=None
     display_gradient=None
     
-    def __init__(self, label="??", display_colour=None, display_gradient=None, is_sequence=False, *args, **kwargs):
+    def __init__(self, label="??", display_colour=None, display_gradient=None, is_sequence=False, is_sun=False, *args, **kwargs):
         """
         Sets up this preset
         """
@@ -108,14 +110,16 @@ class Preset(object):
         self.display_colour = display_colour
         self.display_gradient= display_gradient or []
         self.is_sequence = is_sequence
+        self.is_sun = is_sun
         self.args = args
         self.kwargs = kwargs
+       
     
     def __repr__(self):
         """
         Says what this is
         """
-        out = "Preset '{label}': {colour} - {querystring}".format(label=self.label, colour=self.colour, querystring=self.querystring)
+        out = "Preset '{label}': {colour} - {querystring} - {sunquery}".format(label=self.label, colour=self.colour, querystring=self.querystring, sunquery=self.sunquery)
         return out
     
     def __unicode__(self):
@@ -192,19 +196,34 @@ class Preset(object):
             return "true"
         return ""
     
+    @property
+    def sunquery(self):
+        """
+        Returns sunset or sunrise temperature values
+        """
+        if self.is_sun:
+            sunarg={}
+            #for ii in range(0,len(self.display_gradient)):
+                 #if self.display_gradient[0]>self.display_gradient[1]:
+            sunarg['temp']=list(self.display_gradient)#self.display_gradient[ii].split('K')[0]
+            cs = urlencode(sunarg, doseq=True)
+            return cs
+        return ""
+    
     def render(self):
         """
         Renders this preset as an HTML button
         """
         html = """
-            <a href="javascript:void(0);" class="select_preset preset_button" data-qs="{querystring}" data-sequence="{is_sequence}" style="{css_style}">
+            <a href="javascript:void(0);" class="select_preset preset_button" data-qs="{querystring}" data-sequence="{is_sequence}" data-color="{sun_temp}" style="{css_style}">
                 {label}
             </a>
         """.format(
             querystring=self.querystring,
             css_style=self.render_css(),
             label=self.label,
-            is_sequence=self.render_is_sequence()
+            is_sequence=self.render_is_sequence(),
+            sun_temp=self.sunquery
         )
         return html
 
@@ -250,8 +269,8 @@ class RaspiledControlResource(Resource):
     
     #State what presets to render:
     OFF_PRESET = Preset(label="&#x23FB; Off", display_colour="black", off="")
-    PRESETS = (
-        ("Whites",( #I've had to change the displayed colours from the strip colours for a closer apparent match
+    PRESETS = {
+        "Whites":( #I've had to change the displayed colours from the strip colours for a closer apparent match
                 Preset(label="Candle", display_colour="1500K", fade="1000K"),
                 Preset(label="Tungsten", display_colour="3200K", fade="2000K"),
                 Preset(label="Bulb match", display_colour="3900K", fade="ff821c"), 
@@ -259,21 +278,19 @@ class RaspiledControlResource(Resource):
                 Preset(label="Strip white", display_colour="6000K", fade="3200K"),
                 Preset(label="Daylight", display_colour="6900K", fade="5800K"),
                 Preset(label="Cool white", display_colour="9500K", fade="10500K"),
-            )
-        ),
-        ("Sunrise / Sunset",(
-                Preset(label="&uarr; 2hr", display_gradient=("2000K","5000K"), sunrise=60*60*2, is_sequence=True),
-                Preset(label="&uarr; 1hr", display_gradient=("2000K","5000K"), sunrise=60*60*1, is_sequence=True),
-                Preset(label="&uarr; 30m", display_gradient=("2000K","5000K"), sunrise=60*30, is_sequence=True),
-                Preset(label="&uarr; 1m", display_gradient=("2000K","5000K"), sunrise=60*1, is_sequence=True),
+            ),
+        "Sunrise / Sunset":(
+                Preset(label="&uarr; 2hr", display_gradient=("2000K","5000K"), sunrise=60*60*2, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1hr", display_gradient=("2000K","5000K"), sunrise=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 30m", display_gradient=("2000K","5000K"), sunrise=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1m", display_gradient=("2000K","5000K"), sunrise=60*1, is_sequence=True, is_sun=True),
                 PresetSpace(),
-                Preset(label="&darr; 1m", display_gradient=("5000K","2000K"), sunset=60*1, is_sequence=True),
-                Preset(label="&darr; 30m", display_gradient=("5000K","2000K"), sunset=60*30, is_sequence=True),
-                Preset(label="&darr; 1hr", display_gradient=("5000K","2000K"), sunset=60*60*1, is_sequence=True),
-                Preset(label="&darr; 2hr", display_gradient=("5000K","2000K"), sunset=60*60*2, is_sequence=True),
-            )
-        ),
-        ("Colours", (
+                Preset(label="&darr; 1m", display_gradient=("5000K","2000K"), sunset=60*1, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 30m", display_gradient=("5000K","2000K"), sunset=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1hr", display_gradient=("5000K","2000K"), sunset=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 2hr", display_gradient=("5000K","2000K"), sunset=60*60*2, is_sequence=True, is_sun=True),
+            ),
+        "Colours":(
                 Preset(label="Red", display_colour="#FF0000", fade="#FF0000"),
                 Preset(label="Orange", display_colour="#FF8800", fade="#FF8800"),
                 Preset(label="Yellow", display_colour="#FFFF00", fade="#FFFF00"),
@@ -286,9 +303,8 @@ class RaspiledControlResource(Resource):
                 Preset(label="Purple", display_colour="#8800FF", fade="#7A00FF"), #There's a difference!
                 Preset(label="Magenta", display_colour="#FF00FF", fade="#FF00FF"),
                 Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
-            )
-        ),
-        ("Sequences",(
+            ),
+        "Sequences":(
                 Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="700K,500K,1100K,600K,800K,1000K,500K,1200K", milliseconds="1800", is_sequence=True),
                 Preset(label="&#x1f41f; Fish tank", display_gradient=("#00FF88","#0088FF","#007ACC","#00FFFF"), rotate="00FF88,0088FF,007ACC,00FFFF", milliseconds="2500", is_sequence=True),
                 Preset(label="&#x1f389; Party", display_gradient=("cyan","yellow","magenta"), rotate="cyan,yellow,magenta", milliseconds="1250", is_sequence=True),
@@ -297,8 +313,7 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f6a8; NeeNaw USA", display_gradient=("red","blue"), jump="red,blue", milliseconds="100", is_sequence=True),
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
-        ),
-    )
+    }
     
     def __init__(self, *args, **kwargs):
         """
@@ -345,6 +360,7 @@ class RaspiledControlResource(Resource):
             if request.has_param(key_name):
                 self.led_strip.stop_current_sequence() #Stop current sequence
                 action_func_name = "action__%s" % action_name
+                print(request)
                 _colour_result = getattr(self, action_func_name)(request) #Execute that function
                 break
         
@@ -367,46 +383,27 @@ class RaspiledControlResource(Resource):
         
         #Otherwise return normal page
         request.setHeader("Content-Type", "text/html; charset=utf-8")
-        return """
-            <html>
-            <head>
-                <title>Raspiled</title>
-                <link rel="stylesheet" id="style" href="/static/raspiled.css">
-                <script src="/static/iro.min.js"></script>
-                <script src="/static/jquery3.min.js"></script>
-                <script src="/static/raspiled.js"></script>
-                <script>
-                    //Load our colour-picker
-                    $(document).ready(function(e){{
-                        $.fn.init_colourpicker("{current_hex}");
-                    }});
-                </script>
-            </head>
-            
-            <body>
-                <h1>Raspiled</h1>
-                <div id="current-colour" class="colour-status" style="background-color: {current_hex}; color: {contrast_colour}">{current_hex} {current_colour}</div>
-                <div id="raspiled-color-picker"></div>
-                {presets_html}
-                <div id="off_button">{off_preset_html}</div>
-            </body>
-            
-            </html>
-        """.format(
+        htmlstr=''
+        with open(RASPILED_DIR+'/static/index.html') as file:
+            for line in file:
+                 htmlstr+=line
+        return htmlstr.format(
                 current_colour=current_colour,
                 current_hex=current_hex,
                 contrast_colour=contrast_colour,
                 off_preset_html=self.OFF_PRESET.render(),
-                presets_html=self.render_presets(request)
-                
+                light_html=self.light_presets(request),
+                alarm_html=self.alarm_presets(request),
+                music_html=self.udevelop_presets(request),
+                controls_html=self.udevelop_presets(request)
             ).encode('utf-8')
     
-    def render_presets(self, request):
+    def light_presets(self, request):
         """
-        Renders the presets as options
+        Renders the light presets as options
         """
         out_html_list = []
-        for group_name, presets in self.PRESETS:
+        for group_name, presets in self.PRESETS.items():
             preset_list = []
             #Inner for
             for preset in presets:
@@ -426,7 +423,51 @@ class RaspiledControlResource(Resource):
             out_html_list.append(group_html)
         out_html = "\n".join(out_html_list)
         return out_html
-    
+
+    def alarm_presets(self,request):
+       """
+       Renders the alarm presets as options. Same sunrise or sunset routine except for 100k.
+       """
+       out_html_list = []
+       preset_list = []
+            #Inner for
+       group_name="Sunrise / Sunset"
+       for preset in self.PRESETS[group_name]:
+            try:
+                if preset.display_gradient[0]=='5000K':
+                    preset.display_gradient=('5000K','50K')
+                else:
+                    preset.display_gradient=('50K','5000K')
+            except:
+                pass
+            preset_html = preset.render()
+            preset_list.append(preset_html)
+       group_html = """
+                <div class="preset_group">
+                    <h2>{group_name}</h2>
+                    <div class="presets_row">
+                        {preset_html}
+                    </div>
+                </div>
+            """.format(
+                group_name = group_name,
+                preset_html = "\n".join(preset_list)
+            )
+       out_html_list.append(group_html)
+       out_html = "\n".join(out_html_list)
+       return out_html
+
+    def udevelop_presets(self,request):
+       """
+       Renders the Under Development text.
+       """
+       out_html="""
+           <div class="underdevelop">
+           <h1> Under Development, please refer to the Github repository.</h1>
+           </div>
+       """
+       return out_html
+
     def action__set(self, request):
         """
         Run when user wants to set a colour to a specified value
@@ -449,8 +490,10 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
+        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        print('T:',temps)
         logging.info("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds)
+        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
     def action__sunset(self, request):
         """
@@ -458,8 +501,10 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
+        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        print(temps)
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds)
+        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
     def action__jump(self, request):
         """
@@ -547,22 +592,36 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
+        print(NOT_SET)
         if isinstance(names,(str, unicode)):
             names = [names]
+        print(names)
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
             if val is not NOT_SET: #Once we find a valid value, continue
                break
+        print('val',val)
         #If we have no valid value, then bail
         if val is NOT_SET:
+            print('not_set')
             return default
         try:
-            single_val = val[0]
-            if force is not None:
-                return force(single_val)
-            return single_val
+            if len(val)==1:
+                single_val = val[0]
+                if force is not None:
+                    print('fsv',force(single_val))
+                    return force(single_val)
+                print('sv',single_val)
+                return single_val
+            else:
+                mult_val = val
+                if force is not None:
+                     mult_val = [force(ii) for ii in val]
+                print('mult',mult_val)
+                return mult_val
         except (IndexError, ValueError, TypeError):
             pass
+        print('pass')
         return default
     get_value = get_param
     param = get_param
@@ -631,6 +690,99 @@ def get_matching_pids(name, exclude_self=True):
             pass
     return pids
 
+
+def checkClientAgainstWhitelist(ip, user,token):
+    IPS = {
+           'IP1' : '127.0.0.1',
+           }
+
+    config_path = os.path.expanduser(RASPILED_DIR+'/.whitelist')
+    parser = configparser.ConfigParser(defaults=IPS)
+    
+    if os.path.exists(config_path):
+        parser.read(config_path)
+    else:
+        with open(config_path, 'w') as f:
+            parser.write(f)
+
+    whitelist=parser.defaults()
+    for ii in whitelist.keys():
+        if ip == whitelist[ii]:
+            logging.info('Client registered')
+            connection = True
+            break
+        else:
+            connection = False
+    return connection
+
+from twisted.protocols import basic
+
+class RaspiledProtocol(basic.LineReceiver):#protocol.Protocol):
+    #def __init__(self, factory):
+         #super(RaspiledProtocol, self).__init__(factory=factory)
+    #     self.factory = factory
+     
+
+
+    #    reactor.stop()    
+    #def connectionMade(self):
+    #    self.transport.pauseProducing()
+    #    ip, port = self.transport.client
+         
+    #    result = checkClientAgainstWhitelist(ip,'lsls','token' )
+    #    if result == False:
+    #        logging.warn(('Client attempting to access: IP - {}, Port - {}'.format(ip,port)))
+    #        self.transport.loseConnection()
+    #     else:
+    #        logging.info(('Client connection: IP {}, Port {}'.format(ip,port)))
+    #        self.transport.resumeProducing()
+    #        return RaspiledControlResource
+         #self.factory.numProtocols = self.factory.numProtocols+1 
+         #self.transport.write(
+         #    "Welcome! There are currently %d open connections.\n" %
+         #    (self.factory.numProtocols,))
+    #def connectionLost(self, reason):
+    #    logging.info('Lost connection')
+        #self.transport.loseConnection()
+        #self.factory.numProtocols = self.factory.numProtocols-1
+    #def dataReceived(self,data):
+    #    print(data)
+
+    def __init__(self):
+        self.lines = []
+
+    def lineReceived(self, line):
+        self.lines.append(line)
+        if not line:
+            self.sendResponse()
+
+    def sendResponse(self):
+        self.sendLine("HTTP/1.1 200 OK")
+        self.sendLine("")
+        responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
+        self.transport.write(responseBody)
+        self.transport.loseConnection()
+
+    #def sendResponse(self):
+    #    self.sendLine("HTTP/1.1 200 OK")
+    #    self.sendLine("")
+    #    responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
+    #    self.transport.write(responseBody)
+    #    self.transport.loseConnection()
+        #self.transport.write(data)
+        #apass  
+    #def autentication():
+    #    def __init__(self, username, server, clientref):
+    #        self.name = username
+    #        self.server = password
+    #        self.key = key
+    #def dataReceived(self, data):
+        #self.transport.write(data)
+
+class HTTPEchoFactory(protocol.ServerFactory):
+    def buildProtocol(self, addr):
+        return RaspiledProtocol()
+
 def start_if_not_running():
     """
     Checks if the process is running, if not, starts it!
@@ -639,17 +791,32 @@ def start_if_not_running():
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
-        #resource = RaspiledControlSite()
+        ##resource = RaspiledControlSite()
+        
+	#factory = protocol.ServerFactory()        
         factory = RaspiledControlSite(timeout=8) #8s timeout
-        endpoint = endpoints.TCP4ServerEndpoint(reactor, 9090)
+#        print(factory.protocol.transport.client)
+        #factory.protocol = RaspiledProtocol#(factory)
+        #endpoint.connect(factory)
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, params['pi_port'])
+        #endpoint.listen(RaspiledProtocol)
         endpoint.listen(factory)
         reactor.run()
+#        reactor.listenTCP(9090, HTTPEchoFactory())
+#        reactor.run()
     else:
         logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
-        
+
 if __name__=="__main__":
     start_if_not_running()
-    
-    
 
 
+#f = protocol.ServerFactory()
+#f.protocol = MyProtocol
+#reactor.listenTCP(9111, f)
+#reactor.run()
+
+
+#ip, port = self.transport.client
+#print ip
+#print port

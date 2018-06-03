@@ -87,7 +87,7 @@ class PiPinInterface(pigpio.pi, object):
     """
     
     def __init__(self, params):
-        super(PiPinInterface, self).__init__(params['pi_host'], params['pi_port'])
+        super(PiPinInterface, self).__init__(params['pi_host'], params['pig_port'])
     
     def __unicode__(self):
         """
@@ -139,15 +139,15 @@ class LEDStrip(object):
                 logging.info("No existing iface host")
             elif pi_host and unicode(pi_host) != unicode(iface_host):
                 need_to_generate_new_interface = True
-                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
+                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pig_host))
             try:
                 iface_port = interface._port
             except AttributeError:
                 iface_port = None
-                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pi_port))
+                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             if iface_port is None:
                 need_to_generate_new_interface = True
-            elif pi_port and unicode(pi_port) != unicode(iface_port):
+            elif pig_port and unicode(pig_port) != unicode(iface_port):
                 need_to_generate_new_interface = True
             try:
                 iface_connected = interface.connected
@@ -769,7 +769,7 @@ class LEDStrip(object):
     rot = rotate #Alias
     huerot = rotate #Alias
     
-    def _sunrise_sunset(self, seconds=None, milliseconds=None, setting=True):
+    def _sunrise_sunset(self, seconds=None, milliseconds=None, temps=None,setting=True):
         """
         Silly routine to emulate a sunset
         
@@ -784,16 +784,26 @@ class LEDStrip(object):
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
         """
         logging.info("Running sunrise/sunset.... ")
-        if setting:
-            temp_0 = 6500
-            temp_n = 500
+        print(seconds,temps)
+        if temps==None and setting==True:
+            t0= 6500
+            t1 = 500
+        elif temps==None and setting==False:
+            t0= 500
+            t1 = 6500
+        else:
+            t0=temps[0].split('K')[0]
+            t1=temps[1].split('K')[0]
+        if t0 > t1:
+            temp_0 = int(t0)
+            temp_n = int(t1)
             temp_step = -100
             x_start = 0
             x_step_amount = 1
             logging.info("Sunsetting...")
         else:
-            temp_0 = 600
-            temp_n = 6600
+            temp_0 = int(t0)
+            temp_n = int(t1)
             temp_step = 100
             x_start = 60
             x_step_amount = -1
@@ -813,6 +823,7 @@ class LEDStrip(object):
         for temp in xrange(temp_0,temp_n,temp_step):
             if self._sequence_stop_signal: #Bail if sequence should stop
                 return None
+            print(temp)
             k = u"%sk" % temp
             self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
             x_step += x_step_amount
@@ -821,16 +832,16 @@ class LEDStrip(object):
         t2 = time.time()
         logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
     
-    def sunset(self, seconds=None, milliseconds=None):
+    def sunset(self, seconds=None, milliseconds=None, temps=None):
         """
         Emulates a sunset, run in a separate thread
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, setting=True)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=True)
 
-    def sunrise(self, seconds=None, milliseconds=None):
+    def sunrise(self, seconds=None, milliseconds=None, temps=None):
         """
         Emulates a sunset
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, setting=False)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=False)
 
 
