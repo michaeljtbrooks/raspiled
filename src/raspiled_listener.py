@@ -25,7 +25,7 @@ from named_colours import NAMED_COLOURS
 import copy
 import logging
 import configparser
-
+import datetime
 
 try:
     #python2
@@ -33,7 +33,6 @@ try:
 except ImportError:
     #python3
     from urllib.parse import urlencode
-
 
 APP_NAME="python ./raspiled_listener.py"
 
@@ -88,6 +87,7 @@ DEBUG = False
 def D(item):
     if DEBUG:
         logging.info(item)
+
 
 
 class Preset(object):
@@ -314,7 +314,8 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
     }
-    
+    PRESETSCopy= copy.deepcopy(PRESETS) #Modifiable dictionary. Used in alarms and music.
+
     def __init__(self, *args, **kwargs):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
@@ -360,7 +361,6 @@ class RaspiledControlResource(Resource):
             if request.has_param(key_name):
                 self.led_strip.stop_current_sequence() #Stop current sequence
                 action_func_name = "action__%s" % action_name
-                print(request)
                 _colour_result = getattr(self, action_func_name)(request) #Execute that function
                 break
         
@@ -430,9 +430,10 @@ class RaspiledControlResource(Resource):
        """
        out_html_list = []
        preset_list = []
-            #Inner for
+       #Inner for
        group_name="Sunrise / Sunset"
-       for preset in self.PRESETS[group_name]:
+       presets=self.PRESETSCopy[group_name]
+       for preset in presets:
             try:
                 if preset.display_gradient[0]=='5000K':
                     preset.display_gradient=('5000K','50K')
@@ -443,8 +444,10 @@ class RaspiledControlResource(Resource):
             preset_html = preset.render()
             preset_list.append(preset_html)
        group_html = """
+                <p id="clock" class="current-colour"></p>
+                <h2>{group_name}</h2>
+                <div class="sun-alarm"></div>
                 <div class="preset_group">
-                    <h2>{group_name}</h2>
                     <div class="presets_row">
                         {preset_html}
                     </div>
@@ -491,7 +494,6 @@ class RaspiledControlResource(Resource):
         seconds = request.get_param(["seconds","s","sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         temps = request.get_param(['temp','K'],default=0.0,force=unicode)
-        print('T:',temps)
         logging.info("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
@@ -502,7 +504,6 @@ class RaspiledControlResource(Resource):
         seconds = request.get_param(["seconds","s","sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         temps = request.get_param(['temp','K'],default=0.0,force=unicode)
-        print(temps)
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
@@ -592,36 +593,28 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
-        print(NOT_SET)
         if isinstance(names,(str, unicode)):
             names = [names]
-        print(names)
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
             if val is not NOT_SET: #Once we find a valid value, continue
                break
-        print('val',val)
         #If we have no valid value, then bail
         if val is NOT_SET:
-            print('not_set')
             return default
         try:
             if len(val)==1:
                 single_val = val[0]
                 if force is not None:
-                    print('fsv',force(single_val))
                     return force(single_val)
-                print('sv',single_val)
                 return single_val
             else:
                 mult_val = val
                 if force is not None:
                      mult_val = [force(ii) for ii in val]
-                print('mult',mult_val)
                 return mult_val
         except (IndexError, ValueError, TypeError):
             pass
-        print('pass')
         return default
     get_value = get_param
     param = get_param

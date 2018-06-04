@@ -783,8 +783,7 @@ class LEDStrip(object):
         
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
         """
-        logging.info("Running sunrise/sunset.... ")
-        print(seconds,temps)
+        #logging.info("Running sunrise/sunset.... ")
         if temps==None and setting==True:
             t0= 6500
             t1 = 500
@@ -800,14 +799,14 @@ class LEDStrip(object):
             temp_step = -100
             x_start = 0
             x_step_amount = 1
-            logging.info("Sunsetting...")
+            #logging.info("Sunsetting...")
         else:
             temp_0 = int(t0)
             temp_n = int(t1)
             temp_step = 100
             x_start = 60
             x_step_amount = -1
-            logging.info("Sun rising...")
+            #logging.info("Sun rising...")
         
         #Add in a fudge factor to cater for CPU doing other things:
         FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
@@ -823,7 +822,6 @@ class LEDStrip(object):
         for temp in xrange(temp_0,temp_n,temp_step):
             if self._sequence_stop_signal: #Bail if sequence should stop
                 return None
-            print(temp)
             k = u"%sk" % temp
             self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
             x_step += x_step_amount

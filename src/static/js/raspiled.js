@@ -50,7 +50,7 @@ function init_colourpicker(current_hex){
 	
 	//Bind ajax event to it
 	//Handle events (these trigger AJAX calls to the same domain)
-    var $current_colour_board = $("#current-colour");  
+    var $current_colour_board = $(".current-colour");  
     raspiledColorPicker.on("color:change", function(color, changes) {
         if(!$.colour_picker.suppress_set){ //Sometimes we want to change the UI colour but not send a command to the Raspi
 	    	$.fn.debounce( //Debounced to prevent excessive AJAX calls
