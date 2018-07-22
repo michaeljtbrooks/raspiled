@@ -52,7 +52,9 @@
             {light_html}
         </div>
         <div class="main-menu alarms" id="alarms">
+            <p id="clock" class="current-colour"></p>
             {alarm_html}
+            <button id="alarm_button">Confirm</button>
         </div>
         <div class="main-menu music" id="music">
             {music_html}
@@ -61,5 +63,6 @@
             {controls_html}
         </div>
     </body>
+    {addition_js}
     <script src="/static/js/web_interaction.js"></script>
 </html>

@@ -769,7 +769,7 @@ class LEDStrip(object):
     rot = rotate #Alias
     huerot = rotate #Alias
     
-    def _sunrise_sunset(self, seconds=None, milliseconds=None, temps=None,setting=True):
+    def _sunrise_sunset(self, seconds=None, milliseconds=None,time=None, temps=None,setting=True):
         """
         Silly routine to emulate a sunset
         
@@ -784,51 +784,60 @@ class LEDStrip(object):
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
         """
         #logging.info("Running sunrise/sunset.... ")
-        if temps==None and setting==True:
-            t0= 6500
-            t1 = 500
-        elif temps==None and setting==False:
-            t0= 500
-            t1 = 6500
+        if time==None:
+            if temps==None and setting==True:
+                t0= 6500
+                t1 = 500
+            elif temps==None and setting==False:
+                t0= 500
+                t1 = 6500
+            else:
+                t0=temps[0].split('K')[0]
+                t1=temps[1].split('K')[0]
+            if t0 > t1:
+                temp_0 = int(t0)
+                temp_n = int(t1)
+                temp_step = -100
+                x_start = 0
+                x_step_amount = 1
+                #logging.info("Sunsetting...")
+            else:
+                temp_0 = int(t0)
+                temp_n = int(t1)
+                temp_step = 100
+                x_start = 60
+                x_step_amount = -1
+                #logging.info("Sun rising...")
+             
+            #Add in a fudge factor to cater for CPU doing other things:
+            FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
+             
+            #Calculate our z scaling factor:
+            target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
+            z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
+            x_step = x_start
+            
+            #And run the loop
+            t1 = time.time()
+            check = True #We only check the current values on the first run
+            for temp in xrange(temp_0,temp_n,temp_step):
+                if self._sequence_stop_signal: #Bail if sequence should stop
+                    return None
+                k = u"%sk" % temp
+                self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
+                x_step += x_step_amount
+                check=False
+            
+            t2 = time.time()
+            logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
-            t0=temps[0].split('K')[0]
-            t1=temps[1].split('K')[0]
-        if t0 > t1:
-            temp_0 = int(t0)
-            temp_n = int(t1)
-            temp_step = -100
-            x_start = 0
-            x_step_amount = 1
-            #logging.info("Sunsetting...")
-        else:
-            temp_0 = int(t0)
-            temp_n = int(t1)
-            temp_step = 100
-            x_start = 60
-            x_step_amount = -1
-            #logging.info("Sun rising...")
-        
-        #Add in a fudge factor to cater for CPU doing other things:
-        FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
-        
-        #Calculate our z scaling factor:
-        target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
-        z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
-        x_step = x_start
-        
-        #And run the loop
-        t1 = time.time()
-        check = True #We only check the current values on the first run
-        for temp in xrange(temp_0,temp_n,temp_step):
-            if self._sequence_stop_signal: #Bail if sequence should stop
-                return None
-            k = u"%sk" % temp
-            self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
-            x_step += x_step_amount
-            check=False
-        
-        t2 = time.time()
-        logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
+            for tt in range(0,len(time)):
+                t0=temps[tt+tt*2].split('K')[0]
+                t1=temps[tt+tt*2].split('K')[0]
+                
+                target_time = self.clean_time_in_milliseconds(seconds[tt], milliseconds[tt], default_seconds=1, minimum_milliseconds=1000)
+                alarm_time = time[tt]
+                print(t0,t1,target_time,alarm_time)
     
     def sunset(self, seconds=None, milliseconds=None, temps=None):
         """
@@ -841,5 +850,11 @@ class LEDStrip(object):
         Emulates a sunset
         """
         return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=False)
+
+    def alarm(self, seconds=None, milliseconds=None, time=None, temps=None):
+        """
+        Emulates a sunset or sunrise alarm.
+        """
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, time=time, temps=temps, setting=[False,True])
 
 

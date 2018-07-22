@@ -98,9 +98,9 @@ $(document).ready(function(){
 		var $picker_button = $(this);
 		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
-		console.log(querystring)
+		//console.log(querystring)
                 var colorstring = $picker_button.data("color");
-		console.log(colorstring)
+		//console.log(colorstring)
 		var is_sequence = $picker_button.data("sequence");
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
@@ -108,7 +108,7 @@ $(document).ready(function(){
             $.ajax({
                 url: "/?"+ querystring + '&' + colorstring,
                 success: function(data){
-                    console.log(data);
+                    //console.log(data);
                     update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
                 },
                 error: function(data){
@@ -122,6 +122,33 @@ $(document).ready(function(){
 });
 
 
-
+$(document).ready(function(){
+    $("#alarm_button").on("click",function(e){
+        var $alarm_button = $(this);
+        var sunset_time = 'time=' + $(".dawn-picker").val()
+        var sunrise_time = 'time=' + $(".morning-picker").val()
+        var $sunrise_select = $(".Morning_select option:selected")
+        var $sunset_select = $(".Dawn_select option:selected")
+        var sunrise_querystring = $sunrise_select.data('qs')
+        var sunset_querystring = $sunset_select.data('qs')
+        var sunrise_colorstring = $sunrise_select.data("color");
+        var sunset_colorstring = $sunset_select.data("color");
+        var sunrise_is_sequence = $sunrise_select.data("sequence");
+        var sunset_is_sequence = $sunset_select.data("sequence");
+        $.fn.debounce( //Debounced to prevent excessive AJAX calls
+        $.ajax({
+                url: "/?"+ sunrise_querystring + '&' + sunset_querystring  + '&' + sunrise_colorstring + '&' + sunset_colorstring + '&' + sunrise_time + '&' + sunset_time,
+                success: function(data){
+                    console.log('SUCCESS');
+                },
+                error: function(data){
+                    console.log('ERROR')
+                },
+                dataType: "json"
+            }),
+            150
+        );
+    });
+});
 
 
