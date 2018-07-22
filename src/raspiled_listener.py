@@ -552,12 +552,12 @@ class RaspiledControlResource(Resource):
         """
         m_seconds = request.get_param(["seconds","s","morning"], default=10.0, force=float)
         d_seconds = request.get_param(["seconds","s","dawn"], default=10.0, force=float)
-        time = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
+        hour = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         temps = request.get_param(['temp','K'],default=0.0,force=unicode)
-        logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), m_time))
-        logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), d_time))
-        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, time=time , temps=temps)
+        logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), hour[0]))
+        logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), hour[1]))
+        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, hour=hour , temps=temps)
 
     def action__jump(self, request):
         """
@@ -657,7 +657,6 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """ 
-        print(self,names,default,force)
         if isinstance(names,(str, unicode)):
             names = [names]
         for name in names:
@@ -675,7 +674,6 @@ class SmartRequest(Request, object):
                 return single_val
             else:
                 mult_val = val
-                print(mult_val)
                 if force is not None:
                      mult_val = [force(ii) for ii in val]
                 return mult_val
