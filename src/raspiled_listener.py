@@ -26,6 +26,7 @@ import copy
 import logging
 import configparser
 import datetime
+import requests
 
 try:
     #python2
@@ -93,8 +94,7 @@ def D(item):
 class Preset(object):
     """
     Represents a preset for the web UI for the user to click on
-    
-        args and kwargs become the querystring
+    args and kwargs become the querystring
     """
     args=None
     kwargs=None
@@ -113,7 +113,6 @@ class Preset(object):
         self.is_sun = is_sun
         self.args = args
         self.kwargs = kwargs
-       
     
     def __repr__(self):
         """
@@ -209,15 +208,29 @@ class Preset(object):
             cs = urlencode(sunarg, doseq=True)
             return cs
         return ""
-    
+
     def render(self):
         """
-        Renders this preset as an HTML button
+        Renders this preset as an HTML button or selection. 
         """
         html = """
             <a href="javascript:void(0);" class="select_preset preset_button" data-qs="{querystring}" data-sequence="{is_sequence}" data-color="{sun_temp}" style="{css_style}">
-                {label}
+               {label}
             </a>
+        """.format(
+            querystring=self.querystring,
+            css_style=self.render_css(),
+            label=self.label,
+            is_sequence=self.render_is_sequence(),
+            sun_temp=self.sunquery
+        )
+        return html
+
+    def render_select(self):
+        html = """
+            <option href="javascript:void(0);" value="{label}" class="select_preset preset_option" data-qs="{querystring}" data-sequence="{is_sequence}" data-color="{sun_temp}" style="{css_style}">
+                {label}
+            </option>
         """.format(
             querystring=self.querystring,
             css_style=self.render_css(),
@@ -232,6 +245,8 @@ class PresetSpace(object):
     Simply spaces presets apart!
     """
     def render(self):
+        return "&nbsp;"
+    def render_select(self):
         return "&nbsp;"
 
 
@@ -253,8 +268,8 @@ class RaspiledControlResource(Resource):
         ("colour", "fade"),
         #Sequences
         ("sunrise", "sunrise"),
-        ("morning", "sunrise"),
-        ("dawn", "sunrise"),
+        ("morning", "alarm"),
+        ("dawn", "alarm"),
         ("sunset", "sunset"),
         ("evening", "sunset"),
         ("dusk", "sunset"),
@@ -314,7 +329,20 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
     }
-    PRESETSCopy= copy.deepcopy(PRESETS) #Modifiable dictionary. Used in alarms and music.
+    ALARM_PRESETS = {
+        "Morning":(
+                Preset(label="&uarr; 2hr", display_gradient=("0K","5000K"), morning=60*60*2, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1hr", display_gradient=("0K","5000K"), morning=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 30m", display_gradient=("0K","5000K"), morning=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1m", display_gradient=("0K","5000K"), morning=60*1, is_sequence=True, is_sun=True),
+            ),
+        "Dawn":(
+                Preset(label="&darr; 2hr", display_gradient=("5000K","0K"), dawn=60*60*2, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1hr", display_gradient=("5000K","0K"), dawn=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 30m", display_gradient=("5000K","0K"), dawn=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1m", display_gradient=("5000K","0K"), dawn=60*1, is_sequence=True, is_sun=True),
+            )
+    }
 
     def __init__(self, *args, **kwargs):
         """
@@ -355,7 +383,6 @@ class RaspiledControlResource(Resource):
         Responds to GET requests
         """
         _colour_result = None
-        
         #Look through the actions if the request key exists, perform that action
         for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
             if request.has_param(key_name):
@@ -394,8 +421,9 @@ class RaspiledControlResource(Resource):
                 off_preset_html=self.OFF_PRESET.render(),
                 light_html=self.light_presets(request),
                 alarm_html=self.alarm_presets(request),
-                music_html=self.udevelop_presets(request),
-                controls_html=self.udevelop_presets(request)
+                music_html=self.music_presets(request),
+                controls_html=self.udevelop_presets(request),
+                addition_js=self.js_interactions(request)
             ).encode('utf-8')
     
     def light_presets(self, request):
@@ -429,35 +457,36 @@ class RaspiledControlResource(Resource):
        Renders the alarm presets as options. Same sunrise or sunset routine except for 100k.
        """
        out_html_list = []
-       preset_list = []
-       #Inner for
-       group_name="Sunrise / Sunset"
-       presets=self.PRESETSCopy[group_name]
-       for preset in presets:
-            try:
-                if preset.display_gradient[0]=='5000K':
-                    preset.display_gradient=('5000K','50K')
-                else:
-                    preset.display_gradient=('50K','5000K')
-            except:
-                pass
-            preset_html = preset.render()
-            preset_list.append(preset_html)
-       group_html = """
-                <p id="clock" class="current-colour"></p>
-                <h2>{group_name}</h2>
-                <div class="sun-alarm"></div>
+       for group_name, presets in self.ALARM_PRESETS.items():
+           preset_list = []
+           #Inner for
+           for preset in presets:
+               preset_html = preset.render_select()
+               preset_list.append(preset_html)
+           group_html = """
+                <p> {group_name} time </p>
+                <div class="{group_name}"></div>
                 <div class="preset_group">
-                    <div class="presets_row">
+                    <select class="presets_select {group_name}_select">
                         {preset_html}
-                    </div>
+                    </select>
                 </div>
             """.format(
                 group_name = group_name,
                 preset_html = "\n".join(preset_list)
-            )
-       out_html_list.append(group_html)
+           )
+           out_html_list.append(group_html)
        out_html = "\n".join(out_html_list)
+       return out_html
+
+    def music_presets(self,request):
+       """
+       Renders the Modipy music front page.
+       """
+       out_html="""
+           <iframe src="http://192.168.182.190:6680/mopify/" style="width:100vw;height:100vh">
+           </iframe>
+       """
        return out_html
 
     def udevelop_presets(self,request):
@@ -470,6 +499,16 @@ class RaspiledControlResource(Resource):
            </div>
        """
        return out_html
+    
+    def js_interactions(self,request):
+        request.setHeader("Content-Type", "text/html; charset=utf-8")
+        lat,lon=pi_gps_location()
+        jsstr=''
+        with open(RASPILED_DIR+'/static/js/raspiled_interaction.js') as file:
+            for line in file:
+                 jsstr+=line
+        return jsstr.format(latcoord=str(lat),loncoord=str(lon)).encode('utf-8')
+
 
     def action__set(self, request):
         """
@@ -507,6 +546,19 @@ class RaspiledControlResource(Resource):
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
+    def action__alarm(self, request):
+        """
+        Performs a sunrise over the specified period of time
+        """
+        m_seconds = request.get_param(["seconds","s","morning"], default=10.0, force=float)
+        d_seconds = request.get_param(["seconds","s","dawn"], default=10.0, force=float)
+        time = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
+        milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
+        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), m_time))
+        logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), d_time))
+        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, time=time , temps=temps)
+
     def action__jump(self, request):
         """
         Jump from one specified colour to the next
@@ -555,6 +607,18 @@ class NotSet():
     pass
 NOT_SET = NotSet()
 
+def pi_gps_location(ip=''):
+    if ip=='':
+    	locip = 'https://api.ipify.org?format=json'
+    	r = requests.get(locip)
+    	j = json.loads(r.text)
+    	ipinfo = 'https://ipinfo.io/'+j['ip']
+    else:
+        ipinfo = 'https://ipinfo.io/'+ip
+    r = requests.get(ipinfo)
+    j = json.loads(r.text)
+    lat,lon=j['loc'].split(',')
+    return lat,lon
 
 class SmartRequest(Request, object):
     """
@@ -584,7 +648,7 @@ class SmartRequest(Request, object):
     get_params = get_param_values #Alias
     get_list = get_param_values #Alias
     get_params_list = get_param_values #Alias
-    
+
     def get_param(self, names, default=None, force=None):
         """
         Failsafe way of getting a single querystring value. Will only return one (the first) value if found
@@ -592,7 +656,8 @@ class SmartRequest(Request, object):
         @param names: <str> The name of the param to fetch, or a list of candidate names to try
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
-        """
+        """ 
+        print(self,names,default,force)
         if isinstance(names,(str, unicode)):
             names = [names]
         for name in names:
@@ -610,6 +675,7 @@ class SmartRequest(Request, object):
                 return single_val
             else:
                 mult_val = val
+                print(mult_val)
                 if force is not None:
                      mult_val = [force(ii) for ii in val]
                 return mult_val
@@ -618,7 +684,6 @@ class SmartRequest(Request, object):
         return default
     get_value = get_param
     param = get_param
-    
     def has_params(self, *param_names):
         """
         Returns True or the value if any of the param names given by args exist
