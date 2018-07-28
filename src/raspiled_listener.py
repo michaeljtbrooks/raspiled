@@ -47,6 +47,7 @@ DEFAULTS = {
         'pi_host'     : 'localhost',
         'pi_port'     : 9090,
         'pig_port'    : 8888,
+        'mopidy_port' : 6868,
         'red_pin'     : '',
         'green_pin'   : '',
         'blue_pin'    : ''
@@ -300,7 +301,7 @@ class RaspiledControlResource(Resource):
                 Preset(label="&uarr; 30m", display_gradient=("2000K","5000K"), sunrise=60*30, is_sequence=True, is_sun=True),
                 Preset(label="&uarr; 1m", display_gradient=("2000K","5000K"), sunrise=60*1, is_sequence=True, is_sun=True),
                 PresetSpace(),
-                Preset(label="&darr; 1m", display_gradient=("5000K","2000K"), sunset=60*1, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1m", display_gradient=("5000K","0K"), sunset=60*1, is_sequence=True, is_sun=True),
                 Preset(label="&darr; 30m", display_gradient=("5000K","2000K"), sunset=60*30, is_sequence=True, is_sun=True),
                 Preset(label="&darr; 1hr", display_gradient=("5000K","2000K"), sunset=60*60*1, is_sequence=True, is_sun=True),
                 Preset(label="&darr; 2hr", display_gradient=("5000K","2000K"), sunset=60*60*2, is_sequence=True, is_sun=True),
@@ -484,9 +485,9 @@ class RaspiledControlResource(Resource):
        Renders the Modipy music front page.
        """
        out_html="""
-           <iframe src="http://192.168.182.190:6680/mopify/" style="width:100vw;height:100vh">
+           <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
            </iframe>
-       """
+       """.format(mopify=params['mopidy_port'])
        return out_html
 
     def udevelop_presets(self,request):

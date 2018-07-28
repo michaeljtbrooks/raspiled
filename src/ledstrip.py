@@ -22,7 +22,8 @@ from time import sleep
 import threading
 import subprocess
 import logging
-
+import schedule
+from multiprocessing import Process
 logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
                             datefmt='%H:%M:%S',level=logging.INFO)
 
@@ -660,7 +661,7 @@ class LEDStrip(object):
         """
         Turns calibration OFF
         """
-        self._calibrate = copy.copy(NO_CALIBRATION)
+        self._calibrate = copy.copy(AUTO_CALIBRATION)
         logging.info("Calibration off! %s" % self._calibrate)
     set_calibrate_off = calibrate_off
     set_calibration_off = calibrate_off
@@ -696,7 +697,7 @@ class LEDStrip(object):
         self._sequence_stop_signal = False
         self._sequence.start()
         return self.rgb
-    
+
     def stop_current_sequence(self, timeout=60):
         """
         Stops the current sequence by issuing a stop flag to the sequence thread then joining it
@@ -783,6 +784,7 @@ class LEDStrip(object):
         
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
         """
+        FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
         if hour==None:
             #logging.info("Running sunrise/sunset.... ")
             if temps==None and setting==True:
@@ -795,22 +797,19 @@ class LEDStrip(object):
                 t0=temps[0].split('K')[0]
 		t1=temps[1].split('K')[0]
             if t0 > t1:
-		temp_0 = int(t0)
-                temp_n = int(t1)
                 temp_step = -100
                 x_start = 0
                 x_step_amount = 1
                 #logging.info("Sunsetting...")
             else:
-                temp_0 = int(t0)
-                temp_n = int(t1)
                 temp_step = 100
                 x_start = 60
                 x_step_amount = -1
+            temp_0 = int(t0)
+            temp_n = int(t1)
                 #logging.info("Sun rising...")
         
             #Add in a fudge factor to cater for CPU doing other things:
-            FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
         
             #Calculate our z scaling factor:
             target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
@@ -831,47 +830,26 @@ class LEDStrip(object):
             t2 = time.time()
             logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
+            p=[]
             for tt in range(0,len(hour)):
-                t0=temps[tt+tt*1].split('K')[0]
-                t1=temps[tt+tt*1+1].split('K')[0]
-                milliseconds=[0,0]
-                print(tt,t0,t1)
-                if t0 > t1:
-                    temp_0 = int(t0)
-                    temp_n = int(t1)
-                    temp_step = -100
-                    x_start = 0
-                    x_step_amount = 1
-                    #logging.info("Sunsetting...")
-                else:
-                    temp_0 = int(t0)
-                    temp_n = int(t1)
-                    temp_step = 100
-                    x_start = 60
-                    x_step_amount = -1
-                    #logging.info("Sun rising...")
-        
-                #Add in a fudge factor to cater for CPU doing other things:
-                FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
-        
-                #Calculate our z scaling factor:
-                target_time = self.clean_time_in_milliseconds(seconds[tt], milliseconds[tt], default_seconds=1, minimum_milliseconds=1000)
+                t0=float(temps[tt+tt*1].split('K')[0])
+                t1=float(temps[tt+tt*1+1].split('K')[0])
+                milliseconds=0
                 proc_hour=hour[tt]
-                z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
-                x_step = x_start
-                #And run the loop
-                t1 = time.time()
-                check = True #We only check the current values on the first run
-                for temp in xrange(temp_0,temp_n,temp_step):
-                    if self._sequence_stop_signal: #Bail if sequence should stop
-                        return None
-                    k = u"%sk" % temp
-                    self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
-                    x_step += x_step_amount
-                    check=False
-        
-            t2 = time.time()
-            logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
+		data=(proc_hour,t0,t1,FUDGE_FACTOR,'dayly',seconds[tt],milliseconds)
+                
+                p.append(Process(target=self.schedule_alarm,args=data))
+            #p = Pool(len(hour))
+            #p.imap(self.schedule_alarm,data)
+            #    try:
+            #        logging.info("Dayly Alarm at %ss" % proc_hour)
+            #    except KeyboardInterrupt:
+            #        logging.info("Terminating processes")
+            #        [pp.terminate() for pp in p]
+            
+            [pp.start() for pp in p]
+            pid_alarm=[pp.pid for pp in p]
+            return pid_alarm
 
     def sunset(self, seconds=None, milliseconds=None, temps=None):
         """
@@ -890,4 +868,44 @@ class LEDStrip(object):
         Emulates a sunset
         """
         return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, temps=temps)
+
+    def dayly_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
+        if t_0 > t_1:
+            temp_step = -100
+            x_start = 0
+            x_step_amount = 1
+            #logging.info("Sunsetting...")
+        else:
+            temp_step = 100
+            x_start = 60
+            x_step_amount = -1
+        temp_0 = int(t_0)
+        temp_n = int(t_1)
+        target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
+        z_factor = (target_time*fudge_factor) / 2.564949357
+        x_step = x_start
+        t1 = time.time()
+
+        logging.info('Alarm running at {}'.format(hour))
+        #And run the loop
+        check = True #We only check the current values on the first run
+        for temp in xrange(temp_0,temp_n,temp_step):
+             if self._sequence_stop_signal: #Bail if sequence should stop
+                 return None
+             k = u"%sk" % temp
+             self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
+             x_step += x_step_amount
+             check=False
+        return
+
+    def schedule_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
+        if freq=='dayly':
+            print(freq)
+            schedule.every().day.at(hour).do(self.dayly_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds)
+        else:
+            pass
+
+        while True:
+            schedule.run_pending()
+            time.sleep(1) # wait one minute
 

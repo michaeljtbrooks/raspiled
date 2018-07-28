@@ -2,6 +2,7 @@
 config_path = RASPILED_DIR+'/raspiled.conf'
 pi_port = 8888
 pi_host = localhost
+mopidy_port = 6868
 blue_pin = 24
 green_pin = 22
 red_pin = 17
