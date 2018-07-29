@@ -72,3 +72,13 @@ a{
 #clock{font-size:30px}
 
 .underdevelop{position:absolute;width:50%;margin:auto;left:0;right:0;text-align:center;top:45%;color:red}
+
+.center{position:absolute;width:75vw;height:75vh;margin:auto;left:0;right:0;top:0;bottom:0;text-align:center;background-color:#dfe9ed;border-radius:5px;box-shadow: 5px 8px rgba(66,66,66,0.5);}
+
+.clickme{margin:10px; display: inline-block; padding: 15px 20px;font-size: 16px;cursor: pointer;text-align: center;text-decoration: none;outline: none;color: #fff;background-color: #535D87;border: none;border-radius: 15px;box-shadow: 3px 6px #999;}
+
+.clickme:hover {background-color: #354BA2}
+
+.clickme:active {background-color: #354BA2;box-shadow: 0 5px #666;transform: translateY(4px);}
+
+.inner{position: absolute;top: 25%; left: 50%;transform: translate(-50%,-25%);width: 200px;height: 200px;}

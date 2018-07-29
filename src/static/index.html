@@ -4,7 +4,6 @@
         <link rel="stylesheet" id="style" href="/static/css/raspiled.css">
         <script src="/static/js/iro.min.js"></script>
         <script src="/static/js/jquery3.min.js"></script>
-        <script src="/static/js/raspiled.js"></script>
         <script src="/static/js/picker.js"></script>
         <link rel="stylesheet" id="style" href="/static/css/picker.css">
         <script>
@@ -52,9 +51,15 @@
             {light_html}
         </div>
         <div class="main-menu alarms" id="alarms">
+<<<<<<< HEAD
             <p id="clock" class="current-colour"></p>
             {alarm_html}
             <button id="alarm_button">Confirm</button>
+=======
+            <p id="clock"></p>
+            {alarm_html}
+            <button class='alarm_preset'>Set up!</button>
+>>>>>>> alarm
         </div>
         <div class="main-menu music" id="music">
             {music_html}
@@ -65,4 +70,6 @@
     </body>
     {addition_js}
     <script src="/static/js/web_interaction.js"></script>
+    <script>{addition_js}</script>
+    <script src="/static/js/raspiled.js"></script>
 </html>

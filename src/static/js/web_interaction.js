@@ -118,6 +118,7 @@ $('[id="menu_click"]').click(function(){
     }
 });
 
+<<<<<<< HEAD
 var timeInterval = setInterval(function() {
   TimeClock();
 }, 1000);
@@ -127,3 +128,5 @@ function TimeClock() {
   document.getElementById("clock").innerHTML = d.toLocaleTimeString();
 }
 
+=======
+>>>>>>> alarm

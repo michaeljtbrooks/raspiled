@@ -121,7 +121,31 @@ $(document).ready(function(){
 	});
 });
 
+//Preset pickers:
+$(document).ready(function(){
+        $(".alarm_preset").on("click", function(e){
+                var $m_option_selected = $(".Morning_select option:selected");
+                var $d_option_selected = $(".Dawn_select option:selected");
+                var m_querystring = $m_option_selected.data("qs");
+                var m_colorstring = $m_option_selected.data("color");
+                var m_is_sequence = $m_option_selected.data("sequence");
+                var m_time = 'time=' + $('.morning-picker').val();
+                var d_querystring = $d_option_selected.data("qs");
+                var d_colorstring = $d_option_selected.data("color");
+                var d_is_sequence = $d_option_selected.data("sequence");
+                var d_time = 'time=' + $('.dawn-picker').val();
+                $.fn.debounce( //Debounced to prevent excessive AJAX calls
+                $.ajax({
+                    url: "/?"+ m_querystring + '&' + d_querystring + '&' + m_colorstring + '&' + d_colorstring + '&' + m_is_sequence + '&' + d_is_sequence + '&' + m_time  +'&' + d_time,
+                    success: function(data){
+                    },
+                    error: function(data){
+                    },
+                    dataType: "json"
+                }),
+            150); //Debounce delay ms
 
+<<<<<<< HEAD
 $(document).ready(function(){
     $("#alarm_button").on("click",function(e){
         var $alarm_button = $(this);
@@ -151,4 +175,8 @@ $(document).ready(function(){
     });
 });
 
+=======
+        });
+});
+>>>>>>> alarm
 
