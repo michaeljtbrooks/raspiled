@@ -144,39 +144,6 @@ $(document).ready(function(){
                     dataType: "json"
                 }),
             150); //Debounce delay ms
-
-<<<<<<< HEAD
-$(document).ready(function(){
-    $("#alarm_button").on("click",function(e){
-        var $alarm_button = $(this);
-        var sunset_time = 'time=' + $(".dawn-picker").val()
-        var sunrise_time = 'time=' + $(".morning-picker").val()
-        var $sunrise_select = $(".Morning_select option:selected")
-        var $sunset_select = $(".Dawn_select option:selected")
-        var sunrise_querystring = $sunrise_select.data('qs')
-        var sunset_querystring = $sunset_select.data('qs')
-        var sunrise_colorstring = $sunrise_select.data("color");
-        var sunset_colorstring = $sunset_select.data("color");
-        var sunrise_is_sequence = $sunrise_select.data("sequence");
-        var sunset_is_sequence = $sunset_select.data("sequence");
-        $.fn.debounce( //Debounced to prevent excessive AJAX calls
-        $.ajax({
-                url: "/?"+ sunrise_querystring + '&' + sunset_querystring  + '&' + sunrise_colorstring + '&' + sunset_colorstring + '&' + sunrise_time + '&' + sunset_time,
-                success: function(data){
-                    console.log('SUCCESS');
-                },
-                error: function(data){
-                    console.log('ERROR')
-                },
-                dataType: "json"
-            }),
-            150
-        );
-    });
-});
-
-=======
         });
 });
->>>>>>> alarm
 

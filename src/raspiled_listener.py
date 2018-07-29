@@ -27,11 +27,8 @@ import logging
 import configparser
 import datetime
 import requests
-<<<<<<< HEAD
-=======
 import random
 import string
->>>>>>> alarm
 
 try:
     #python2
@@ -420,16 +417,6 @@ class RaspiledControlResource(Resource):
         """
         Responds to GET requests
         """
-<<<<<<< HEAD
-        _colour_result = None
-        #Look through the actions if the request key exists, perform that action
-        for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
-            if request.has_param(key_name):
-                self.led_strip.stop_current_sequence() #Stop current sequence
-                action_func_name = "action__%s" % action_name
-                _colour_result = getattr(self, action_func_name)(request) #Execute that function
-                break
-=======
         accepted_client = self.client_LOGIN(request)
         if accepted_client:
             _colour_result = None
@@ -445,8 +432,6 @@ class RaspiledControlResource(Resource):
             current_colour = "({})".format(self.led_strip)
             current_hex = self.led_strip.hex
             contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
->>>>>>> alarm
-        
             #Return a JSON object if a result:
             if _colour_result is not None:
                 json_data = {
@@ -475,9 +460,6 @@ class RaspiledControlResource(Resource):
                 music_html=self.music_presets(request),
                 controls_html=self.udevelop_presets(request),
                 addition_js=self.js_interactions(request)
-<<<<<<< HEAD
-            ).encode('utf-8')
-=======
                 ).encode('utf-8')
         else:
             # Authenticatiom
@@ -505,7 +487,6 @@ class RaspiledControlResource(Resource):
         """
         self.user = request.get_param("user", force=unicode)
         self.pswd = request.get_param("pswd", force=unicode)
-        print(self.user,self.pswd)
         if (self.user==None or self.pswd == None ):
             pass
         elif (self.user=='' or self.pswd == '' ):
@@ -547,7 +528,6 @@ class RaspiledControlResource(Resource):
     def whitelistjson2file(self):
         with open(wlist_path, 'w') as write_file:
             json.dump(self.session_data, write_file)
->>>>>>> alarm
     
     def light_presets(self, request):
         """
@@ -607,15 +587,9 @@ class RaspiledControlResource(Resource):
        Renders the Modipy music front page.
        """
        out_html="""
-<<<<<<< HEAD
-           <iframe src="http://192.168.182.190:6680/mopify/" style="width:100vw;height:100vh">
-           </iframe>
-       """
-=======
            <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
            </iframe>
        """.format(mopify=['mopidy_port'])
->>>>>>> alarm
        return out_html
 
     def udevelop_presets(self,request):
@@ -681,14 +655,6 @@ class RaspiledControlResource(Resource):
         """
         m_seconds = request.get_param(["seconds","s","morning"], default=10.0, force=float)
         d_seconds = request.get_param(["seconds","s","dawn"], default=10.0, force=float)
-<<<<<<< HEAD
-        time = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
-        milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
-        logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), m_time))
-        logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), d_time))
-        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, time=time , temps=temps)
-=======
         hour = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
         freq = request.get_param(["freq"], default='daily', force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
@@ -696,7 +662,6 @@ class RaspiledControlResource(Resource):
         logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), hour[0]))
         logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), hour[1]))
         return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
->>>>>>> alarm
 
     def action__jump(self, request):
         """
@@ -796,10 +761,6 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """ 
-<<<<<<< HEAD
-        print(self,names,default,force)
-=======
->>>>>>> alarm
         if isinstance(names,(str, unicode)):
             names = [names]
         for name in names:
@@ -817,7 +778,6 @@ class SmartRequest(Request, object):
                 return single_val
             else:
                 mult_val = val
-                print(mult_val)
                 if force is not None:
                      mult_val = [force(ii) for ii in val]
                 return mult_val
