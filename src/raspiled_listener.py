@@ -26,6 +26,9 @@ import copy
 import logging
 import configparser
 import datetime
+import requests
+import random
+import string
 
 try:
     #python2
@@ -46,12 +49,14 @@ DEFAULTS = {
         'pi_host'     : 'localhost',
         'pi_port'     : 9090,
         'pig_port'    : 8888,
+        'mopidy_port' : 6868,
         'red_pin'     : '',
         'green_pin'   : '',
         'blue_pin'    : ''
             }
 
 config_path = os.path.expanduser(RASPILED_DIR+'/raspiled.conf')
+wlist_path = os.path.expanduser(RASPILED_DIR+'/.whitelist.json')
 parser = configparser.ConfigParser(defaults=DEFAULTS)
 
 if os.path.exists(config_path):
@@ -93,8 +98,7 @@ def D(item):
 class Preset(object):
     """
     Represents a preset for the web UI for the user to click on
-    
-        args and kwargs become the querystring
+    args and kwargs become the querystring
     """
     args=None
     kwargs=None
@@ -113,7 +117,6 @@ class Preset(object):
         self.is_sun = is_sun
         self.args = args
         self.kwargs = kwargs
-       
     
     def __repr__(self):
         """
@@ -209,15 +212,29 @@ class Preset(object):
             cs = urlencode(sunarg, doseq=True)
             return cs
         return ""
-    
+
     def render(self):
         """
-        Renders this preset as an HTML button
+        Renders this preset as an HTML button or selection. 
         """
         html = """
             <a href="javascript:void(0);" class="select_preset preset_button" data-qs="{querystring}" data-sequence="{is_sequence}" data-color="{sun_temp}" style="{css_style}">
-                {label}
+               {label}
             </a>
+        """.format(
+            querystring=self.querystring,
+            css_style=self.render_css(),
+            label=self.label,
+            is_sequence=self.render_is_sequence(),
+            sun_temp=self.sunquery
+        )
+        return html
+
+    def render_select(self):
+        html = """
+            <option href="javascript:void(0);" value="{label}" class="select_preset preset_option" data-qs="{querystring}" data-sequence="{is_sequence}" data-color="{sun_temp}" style="{css_style}">
+                {label}
+            </option>
         """.format(
             querystring=self.querystring,
             css_style=self.render_css(),
@@ -233,6 +250,8 @@ class PresetSpace(object):
     """
     def render(self):
         return "&nbsp;"
+    def render_select(self):
+        return "&nbsp;"
 
 
 class RaspiledControlResource(Resource):
@@ -242,6 +261,10 @@ class RaspiledControlResource(Resource):
     isLeaf = False #Allows us to go into dirs
     led_strip = None #Populated at init
     
+    PARAM_TO_AUTHENTICATE = (
+        ("user","newclient"),
+        ("ukey","authenticate"),
+        )
     #State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
     PARAM_TO_ACTION_MAPPING = (
         #Stat actions
@@ -253,8 +276,8 @@ class RaspiledControlResource(Resource):
         ("colour", "fade"),
         #Sequences
         ("sunrise", "sunrise"),
-        ("morning", "sunrise"),
-        ("dawn", "sunrise"),
+        ("morning", "alarm"),
+        ("dawn", "alarm"),
         ("sunset", "sunset"),
         ("evening", "sunset"),
         ("dusk", "sunset"),
@@ -314,7 +337,20 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
     }
-    PRESETSCopy= copy.deepcopy(PRESETS) #Modifiable dictionary. Used in alarms and music.
+    ALARM_PRESETS = {
+        "Morning":(
+                Preset(label="&uarr; 2hr", display_gradient=("0K","5000K"), morning=60*60*2, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1hr", display_gradient=("0K","5000K"), morning=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 30m", display_gradient=("0K","5000K"), morning=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&uarr; 1m", display_gradient=("0K","5000K"), morning=60*1, is_sequence=True, is_sun=True),
+            ),
+        "Dawn":(
+                Preset(label="&darr; 2hr", display_gradient=("5000K","0K"), dawn=60*60*2, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1hr", display_gradient=("5000K","0K"), dawn=60*60*1, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 30m", display_gradient=("5000K","0K"), dawn=60*30, is_sequence=True, is_sun=True),
+                Preset(label="&darr; 1m", display_gradient=("5000K","0K"), dawn=60*1, is_sequence=True, is_sun=True),
+            )
+    }
 
     def __init__(self, *args, **kwargs):
         """
@@ -349,54 +385,149 @@ class RaspiledControlResource(Resource):
         if path in self.children:
             return self.children[path]
         return self.getChild(path, request)
-    
+
+    def client_LOGIN(self, request):
+        accepted_connection=False
+        self.ip=request.getClientIP()
+        self.session_data = {
+              '0':{
+                   'user'  :  'pi',
+                   'psw'   :  '',
+                   'ip'    :  ['127.0.0.1'],
+                   'key'   :  '',
+                   'last_c':  '',
+                   'u_key' :  '',
+                  }
+              }
+        if os.path.exists(wlist_path):
+            with open(wlist_path) as json_data:
+                self.session_data = json.load(json_data)
+        else:
+             self.whitelistjson2file()
+        for key, value in self.session_data.items():
+            if accepted_connection==True:
+                break
+            for ip in value['ip']:
+                if self.ip==ip:
+                    accepted_connection=True
+                    break
+        return accepted_connection
+   
     def render_GET(self, request):
         """
         Responds to GET requests
         """
-        _colour_result = None
+        accepted_client = self.client_LOGIN(request)
+        if accepted_client:
+            _colour_result = None
+            #Look through the actions if the request key exists, perform that action
+            for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
+                if request.has_param(key_name):
+                    self.led_strip.stop_current_sequence() #Stop current sequence
+                    action_func_name = "action__%s" % action_name
+                    _colour_result = getattr(self, action_func_name)(request) #Execute that function
+                    break
         
-        #Look through the actions if the request key exists, perform that action
-        for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
-            if request.has_param(key_name):
-                self.led_strip.stop_current_sequence() #Stop current sequence
-                action_func_name = "action__%s" % action_name
-                _colour_result = getattr(self, action_func_name)(request) #Execute that function
-                break
+            #Now deduce our colour:
+            current_colour = "({})".format(self.led_strip)
+            current_hex = self.led_strip.hex
+            contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
+            #Return a JSON object if a result:
+            if _colour_result is not None:
+                json_data = {
+                   "current" : current_hex,
+                   "contrast" : contrast_colour,
+                   "current_rgb": current_colour
+                }
+                try:
+                    return json.dumps(json_data)
+                except:
+                    return b"Json fkucked up"
         
-        #Now deduce our colour:
-        current_colour = "({})".format(self.led_strip)
-        current_hex = self.led_strip.hex
-        contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
-        
-        #Return a JSON object if a result:
-        if _colour_result is not None:
-            json_data = {
-                "current" : current_hex,
-                "contrast" : contrast_colour,
-                "current_rgb": current_colour
-            }
-            try:
-                return json.dumps(json_data)
-            except:
-                return b"Json fkucked up"
-        
-        #Otherwise return normal page
-        request.setHeader("Content-Type", "text/html; charset=utf-8")
-        htmlstr=''
-        with open(RASPILED_DIR+'/static/index.html') as file:
-            for line in file:
-                 htmlstr+=line
-        return htmlstr.format(
+            #Otherwise return normal page
+            request.setHeader("Content-Type", "text/html; charset=utf-8")
+            htmlstr=''
+            with open(RASPILED_DIR+'/static/index.html') as file:
+                for line in file:
+                     htmlstr+=line
+            return htmlstr.format(
                 current_colour=current_colour,
                 current_hex=current_hex,
                 contrast_colour=contrast_colour,
                 off_preset_html=self.OFF_PRESET.render(),
                 light_html=self.light_presets(request),
                 alarm_html=self.alarm_presets(request),
-                music_html=self.udevelop_presets(request),
-                controls_html=self.udevelop_presets(request)
-            ).encode('utf-8')
+                music_html=self.music_presets(request),
+                controls_html=self.udevelop_presets(request),
+                addition_js=self.js_interactions(request)
+                ).encode('utf-8')
+        else:
+            # Authenticatiom
+            _connection_result=None
+            for key_name, action_name in self.PARAM_TO_AUTHENTICATE:
+                if request.has_param(key_name):
+                    action_func_name = "action__%s" % action_name
+                    _connection_result = getattr(self, action_func_name)(request)
+                    break
+            if _connection_result is not None:
+                  try:
+                      return json.dumps(_connection_result)
+                  except:
+                      return b"Json fkucked up"
+            request.setHeader("Content-Type", "text/html; charset=utf-8")
+            htmlstr=''
+            with open(RASPILED_DIR+'/static/singin.html') as file:
+                for line in file:
+                     htmlstr+=line
+            return htmlstr.encode('utf-8')
+            
+    def action__newclient(self,request):
+        """
+        Push a new client to the autentication or appends the new ip to the dictionary of sessions.
+        """
+        self.user = request.get_param("user", force=unicode)
+        self.pswd = request.get_param("pswd", force=unicode)
+        if (self.user==None or self.pswd == None ):
+            pass
+        elif (self.user=='' or self.pswd == '' ):
+            return {'error':True,'message':'Empty user or password','accepted':False,'authentication':False}
+        else:
+            csession = request.getSession()
+            self.key = csession.uid
+            for key, value in self.session_data.items():
+                if value['user'] == self.user and value['psw'] == self.pswd:
+                    value['ip'].append(self.ip)
+                    self.whitelistjson2file()
+                    return {'error':False,'message':'Success','accepted':True,'authentication':False}        
+            self.ukey = ''.join(random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(10))
+            logging.info("Attempt from user: %s with IP: %s to access the server. Unique key: %s" % (self.user,self.ip,self.ukey))
+            return {'error':False,'message':'Authenticate','accepted':False,'authentication':True}
+    
+    def action__authenticate(self,request):
+        """
+        Client authenticate with random string generated in the server
+        """
+        user_ukey = request.get_param("ukey", force=unicode)
+        if self.ukey == user_ukey:
+            self.session_data[str(len(self.session_data.keys()))]={
+                                                                   'user'  :  self.user,
+                                                                   'psw'   :  self.pswd,
+                                                                   'ip'    :  [self.ip],
+                                                                   'key'   :  self.key,
+                                                                   'last_c':  str(datetime.datetime.now()),
+                                                                   'u_key' :  self.ukey,
+                                                                  }
+            self.whitelistjson2file()
+            return {'error':False,'message':'Success','accepted':True,'authentication':False}
+           
+        else:
+            self.ukey=''.join(random.SystemRandom().choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(10))
+            logging.info("New unique key: %s" % self.ukey)
+            return {'error':True,'message':'New authenticate code','accepted':False,'authentication':True}
+
+    def whitelistjson2file(self):
+        with open(wlist_path, 'w') as write_file:
+            json.dump(self.session_data, write_file)
     
     def light_presets(self, request):
         """
@@ -429,35 +560,36 @@ class RaspiledControlResource(Resource):
        Renders the alarm presets as options. Same sunrise or sunset routine except for 100k.
        """
        out_html_list = []
-       preset_list = []
-       #Inner for
-       group_name="Sunrise / Sunset"
-       presets=self.PRESETSCopy[group_name]
-       for preset in presets:
-            try:
-                if preset.display_gradient[0]=='5000K':
-                    preset.display_gradient=('5000K','50K')
-                else:
-                    preset.display_gradient=('50K','5000K')
-            except:
-                pass
-            preset_html = preset.render()
-            preset_list.append(preset_html)
-       group_html = """
-                <p id="clock" class="current-colour"></p>
-                <h2>{group_name}</h2>
-                <div class="sun-alarm"></div>
+       for group_name, presets in self.ALARM_PRESETS.items():
+           preset_list = []
+           #Inner for
+           for preset in presets:
+               preset_html = preset.render_select()
+               preset_list.append(preset_html)
+           group_html = """
+                <p> {group_name} time </p>
+                <div class="{group_name}"></div>
                 <div class="preset_group">
-                    <div class="presets_row">
+                    <select class="presets_select {group_name}_select">
                         {preset_html}
-                    </div>
+                    </select>
                 </div>
             """.format(
                 group_name = group_name,
                 preset_html = "\n".join(preset_list)
-            )
-       out_html_list.append(group_html)
+           )
+           out_html_list.append(group_html)
        out_html = "\n".join(out_html_list)
+       return out_html
+
+    def music_presets(self,request):
+       """
+       Renders the Modipy music front page.
+       """
+       out_html="""
+           <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
+           </iframe>
+       """.format(mopify=['mopidy_port'])
        return out_html
 
     def udevelop_presets(self,request):
@@ -470,6 +602,16 @@ class RaspiledControlResource(Resource):
            </div>
        """
        return out_html
+    
+    def js_interactions(self,request):
+        request.setHeader("Content-Type", "text/html; charset=utf-8")
+        lat,lon=pi_gps_location()
+        jsstr=''
+        with open(RASPILED_DIR+'/static/js/raspiled_interaction.js') as file:
+            for line in file:
+                 jsstr+=line
+        return jsstr.format(latcoord=str(lat),loncoord=str(lon)).encode('utf-8')
+
 
     def action__set(self, request):
         """
@@ -507,6 +649,20 @@ class RaspiledControlResource(Resource):
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
     
+    def action__alarm(self, request):
+        """
+        Performs a sunrise over the specified period of time
+        """
+        m_seconds = request.get_param(["seconds","s","morning"], default=10.0, force=float)
+        d_seconds = request.get_param(["seconds","s","dawn"], default=10.0, force=float)
+        hour = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
+        freq = request.get_param(["freq"], default='daily', force=float)
+        milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
+        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), hour[0]))
+        logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), hour[1]))
+        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
+
     def action__jump(self, request):
         """
         Jump from one specified colour to the next
@@ -555,6 +711,18 @@ class NotSet():
     pass
 NOT_SET = NotSet()
 
+def pi_gps_location(ip=''):
+    if ip=='':
+    	locip = 'https://api.ipify.org?format=json'
+    	r = requests.get(locip)
+    	j = json.loads(r.text)
+    	ipinfo = 'https://ipinfo.io/'+j['ip']
+    else:
+        ipinfo = 'https://ipinfo.io/'+ip
+    r = requests.get(ipinfo)
+    j = json.loads(r.text)
+    lat,lon=j['loc'].split(',')
+    return lat,lon
 
 class SmartRequest(Request, object):
     """
@@ -584,7 +752,7 @@ class SmartRequest(Request, object):
     get_params = get_param_values #Alias
     get_list = get_param_values #Alias
     get_params_list = get_param_values #Alias
-    
+
     def get_param(self, names, default=None, force=None):
         """
         Failsafe way of getting a single querystring value. Will only return one (the first) value if found
@@ -592,7 +760,7 @@ class SmartRequest(Request, object):
         @param names: <str> The name of the param to fetch, or a list of candidate names to try
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
-        """
+        """ 
         if isinstance(names,(str, unicode)):
             names = [names]
         for name in names:
@@ -618,7 +786,6 @@ class SmartRequest(Request, object):
         return default
     get_value = get_param
     param = get_param
-    
     def has_params(self, *param_names):
         """
         Returns True or the value if any of the param names given by args exist
@@ -638,16 +805,15 @@ class SmartRequest(Request, object):
         """
         return self.get_param(name)
     
-
-        
 class RaspiledControlSite(Site, object):
     """
     Site thread which initialises the RaspiledControlResource properly
     """
     def __init__(self, *args, **kwargs):
+        self.clients=[]
         resource = kwargs.pop("resource",RaspiledControlResource())
         super(RaspiledControlSite, self).__init__(resource=resource, requestFactory=SmartRequest, *args, **kwargs)
-    
+
     def stopFactory(self):
         """
         Called automatically when exiting the reactor. Here we tell the LEDstrip to tear down its resources
@@ -684,98 +850,6 @@ def get_matching_pids(name, exclude_self=True):
     return pids
 
 
-def checkClientAgainstWhitelist(ip, user,token):
-    IPS = {
-           'IP1' : '127.0.0.1',
-           }
-
-    config_path = os.path.expanduser(RASPILED_DIR+'/.whitelist')
-    parser = configparser.ConfigParser(defaults=IPS)
-    
-    if os.path.exists(config_path):
-        parser.read(config_path)
-    else:
-        with open(config_path, 'w') as f:
-            parser.write(f)
-
-    whitelist=parser.defaults()
-    for ii in whitelist.keys():
-        if ip == whitelist[ii]:
-            logging.info('Client registered')
-            connection = True
-            break
-        else:
-            connection = False
-    return connection
-
-from twisted.protocols import basic
-
-class RaspiledProtocol(basic.LineReceiver):#protocol.Protocol):
-    #def __init__(self, factory):
-         #super(RaspiledProtocol, self).__init__(factory=factory)
-    #     self.factory = factory
-     
-
-
-    #    reactor.stop()    
-    #def connectionMade(self):
-    #    self.transport.pauseProducing()
-    #    ip, port = self.transport.client
-         
-    #    result = checkClientAgainstWhitelist(ip,'lsls','token' )
-    #    if result == False:
-    #        logging.warn(('Client attempting to access: IP - {}, Port - {}'.format(ip,port)))
-    #        self.transport.loseConnection()
-    #     else:
-    #        logging.info(('Client connection: IP {}, Port {}'.format(ip,port)))
-    #        self.transport.resumeProducing()
-    #        return RaspiledControlResource
-         #self.factory.numProtocols = self.factory.numProtocols+1 
-         #self.transport.write(
-         #    "Welcome! There are currently %d open connections.\n" %
-         #    (self.factory.numProtocols,))
-    #def connectionLost(self, reason):
-    #    logging.info('Lost connection')
-        #self.transport.loseConnection()
-        #self.factory.numProtocols = self.factory.numProtocols-1
-    #def dataReceived(self,data):
-    #    print(data)
-
-    def __init__(self):
-        self.lines = []
-
-    def lineReceived(self, line):
-        self.lines.append(line)
-        if not line:
-            self.sendResponse()
-
-    def sendResponse(self):
-        self.sendLine("HTTP/1.1 200 OK")
-        self.sendLine("")
-        responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
-        self.transport.write(responseBody)
-        self.transport.loseConnection()
-
-    #def sendResponse(self):
-    #    self.sendLine("HTTP/1.1 200 OK")
-    #    self.sendLine("")
-    #    responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
-    #    self.transport.write(responseBody)
-    #    self.transport.loseConnection()
-        #self.transport.write(data)
-        #apass  
-    #def autentication():
-    #    def __init__(self, username, server, clientref):
-    #        self.name = username
-    #        self.server = password
-    #        self.key = key
-    #def dataReceived(self, data):
-        #self.transport.write(data)
-
-class HTTPEchoFactory(protocol.ServerFactory):
-    def buildProtocol(self, addr):
-        return RaspiledProtocol()
-
 def start_if_not_running():
     """
     Checks if the process is running, if not, starts it!
@@ -784,32 +858,13 @@ def start_if_not_running():
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
-        ##resource = RaspiledControlSite()
-        
-	#factory = protocol.ServerFactory()        
         factory = RaspiledControlSite(timeout=8) #8s timeout
-#        print(factory.protocol.transport.client)
-        #factory.protocol = RaspiledProtocol#(factory)
-        #endpoint.connect(factory)
         endpoint = endpoints.TCP4ServerEndpoint(reactor, params['pi_port'])
-        #endpoint.listen(RaspiledProtocol)
         endpoint.listen(factory)
         reactor.run()
-#        reactor.listenTCP(9090, HTTPEchoFactory())
-#        reactor.run()
     else:
         logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
 
 if __name__=="__main__":
     start_if_not_running()
 
-
-#f = protocol.ServerFactory()
-#f.protocol = MyProtocol
-#reactor.listenTCP(9111, f)
-#reactor.run()
-
-
-#ip, port = self.transport.client
-#print ip
-#print port

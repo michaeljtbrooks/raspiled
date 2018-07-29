@@ -9,6 +9,7 @@ body {
 h1, h2, h3, h4 {
 	font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Hoefler Text", Georgia, "Lucida Bright", Cambria, Times, "Times New Roman", serif;
 }
+iframe{width:100vw;height:100vh}
 div#raspiled-color-picker svg{
     margin: 0px auto;
 }
@@ -62,10 +63,22 @@ a{
 
 .logos img{max-width: 25%; max-height:50px; margin-left:15px;margin-right:15px;}
 
-.light,.alarms,.music,.control{width:96vw;height:96vh;position:absolute;left:0;top:0;right:0;bottom:0;padding:2vh 2vw 2vh 2vw ;text-align:center} 
+.light,.alarms,.music,.control{width:96vw;height:96vh;position:absolute;left:0;top:0;right:0;bottom:0;text-align:center} 
+
+.light,.alarms,.control{padding:2vh 2vw 2vh 2vw}
 
 .alarms,.music,.control{display:none}
 
 #clock{font-size:30px}
 
 .underdevelop{position:absolute;width:50%;margin:auto;left:0;right:0;text-align:center;top:45%;color:red}
+
+.center{position:absolute;width:75vw;height:75vh;margin:auto;left:0;right:0;top:0;bottom:0;text-align:center;background-color:#dfe9ed;border-radius:5px;box-shadow: 5px 8px rgba(66,66,66,0.5);}
+
+.clickme{margin:10px; display: inline-block; padding: 15px 20px;font-size: 16px;cursor: pointer;text-align: center;text-decoration: none;outline: none;color: #fff;background-color: #535D87;border: none;border-radius: 15px;box-shadow: 3px 6px #999;}
+
+.clickme:hover {background-color: #354BA2}
+
+.clickme:active {background-color: #354BA2;box-shadow: 0 5px #666;transform: translateY(4px);}
+
+.inner{position: absolute;top: 25%; left: 50%;transform: translate(-50%,-25%);width: 200px;height: 200px;}

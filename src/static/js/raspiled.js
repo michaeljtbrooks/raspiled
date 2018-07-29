@@ -98,9 +98,9 @@ $(document).ready(function(){
 		var $picker_button = $(this);
 		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
-		console.log(querystring)
+		//console.log(querystring)
                 var colorstring = $picker_button.data("color");
-		console.log(colorstring)
+		//console.log(colorstring)
 		var is_sequence = $picker_button.data("sequence");
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
@@ -108,7 +108,7 @@ $(document).ready(function(){
             $.ajax({
                 url: "/?"+ querystring + '&' + colorstring,
                 success: function(data){
-                    console.log(data);
+                    //console.log(data);
                     update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
                 },
                 error: function(data){
@@ -121,7 +121,29 @@ $(document).ready(function(){
 	});
 });
 
-
-
-
+//Preset pickers:
+$(document).ready(function(){
+        $(".alarm_preset").on("click", function(e){
+                var $m_option_selected = $(".Morning_select option:selected");
+                var $d_option_selected = $(".Dawn_select option:selected");
+                var m_querystring = $m_option_selected.data("qs");
+                var m_colorstring = $m_option_selected.data("color");
+                var m_is_sequence = $m_option_selected.data("sequence");
+                var m_time = 'time=' + $('.morning-picker').val();
+                var d_querystring = $d_option_selected.data("qs");
+                var d_colorstring = $d_option_selected.data("color");
+                var d_is_sequence = $d_option_selected.data("sequence");
+                var d_time = 'time=' + $('.dawn-picker').val();
+                $.fn.debounce( //Debounced to prevent excessive AJAX calls
+                $.ajax({
+                    url: "/?"+ m_querystring + '&' + d_querystring + '&' + m_colorstring + '&' + d_colorstring + '&' + m_is_sequence + '&' + d_is_sequence + '&' + m_time  +'&' + d_time,
+                    success: function(data){
+                    },
+                    error: function(data){
+                    },
+                    dataType: "json"
+                }),
+            150); //Debounce delay ms
+        });
+});
 
