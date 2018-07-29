@@ -1,0 +1,71 @@
+/* Raspiled - CSS */
+
+body {
+	font-family: "Trebuchet MS", "Trebuchet", Arial, Helvetica, "Liberation Sans", "Sans", sans-serif;
+    font-size: 10pt;
+    font-size: 1.0rem;
+    background: #f8f8f8;
+}
+h1, h2, h3, h4 {
+	font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Hoefler Text", Georgia, "Lucida Bright", Cambria, Times, "Times New Roman", serif;
+}
+div#raspiled-color-picker svg{
+    margin: 0px auto;
+}
+div.colour-status{
+    text-align: center;
+    width: 16em;
+    margin: 0.5em auto;
+    font-family: Palatino, "Palatino Linotype", "Book Antiqua", "Hoefler Text", Georgia, "Lucida Bright", Cambria, Times, "Times New Roman", serif;
+    font-size: 1.6rem;
+}
+
+a{
+	text-decoration: none;
+}
+.preset_button{
+	display: inline-block;
+	padding: 0.5em 1.0em;
+	margin-right: 0.2em;
+	margin-bottom: 0.5em;
+}
+
+.button_selected{
+    border: 3px solid #202020;
+}
+.button_selected_error{
+    border: 3px solid #CC0000;
+}
+
+#off_button {
+	position: relative;
+    margin: 20px;
+    right: 0;
+    left: 0;
+	top: 0;
+}
+
+.menu{position:fixed;z-index:5;background-color:#dfe9ed;top:0px;right:0;height:5vh;min-height: 50px; width:3vw;min-width: 45px;border-bottom-left-radius:10px;}
+
+.menu_control li{list-style: none;position: absolute;background: #000;cursor: pointer}
+
+
+.menu_control li:nth-child(1){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 20%;}
+.menu_control li:nth-child(2){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 45%;}
+.menu_control li:nth-child(3){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 70%;}
+
+.menu_content{position:fixed;z-index:5;background-color:#dfe9ed;top: 0; right:0;height:100vh;width:0;color:black;text-align: center;padding-bottom:3vh}
+
+.menu_content div{margin-top:10px;margin-bottom:20px}
+
+.logo img{max-width: 50%; max-height:50px; margin-left:15px;margin-right:15px;}
+
+.logos img{max-width: 25%; max-height:50px; margin-left:15px;margin-right:15px;}
+
+.light,.alarms,.music,.control{width:96vw;height:96vh;position:absolute;left:0;top:0;right:0;bottom:0;padding:2vh 2vw 2vh 2vw ;text-align:center} 
+
+.alarms,.music,.control{display:none}
+
+#clock{font-size:30px}
+
+.underdevelop{position:absolute;width:50%;margin:auto;left:0;right:0;text-align:center;top:45%;color:red}

@@ -50,7 +50,7 @@ function init_colourpicker(current_hex){
 	
 	//Bind ajax event to it
 	//Handle events (these trigger AJAX calls to the same domain)
-    var $current_colour_board = $("#current-colour");  
+    var $current_colour_board = $(".current-colour");  
     raspiledColorPicker.on("color:change", function(color, changes) {
         if(!$.colour_picker.suppress_set){ //Sometimes we want to change the UI colour but not send a command to the Raspi
 	    	$.fn.debounce( //Debounced to prevent excessive AJAX calls
@@ -98,12 +98,15 @@ $(document).ready(function(){
 		var $picker_button = $(this);
 		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
+		console.log(querystring)
+                var colorstring = $picker_button.data("color");
+		console.log(colorstring)
 		var is_sequence = $picker_button.data("sequence");
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
 		$.fn.debounce( //Debounced to prevent excessive AJAX calls
             $.ajax({
-                url: "/?"+querystring,
+                url: "/?"+ querystring + '&' + colorstring,
                 success: function(data){
                     console.log(data);
                     update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
