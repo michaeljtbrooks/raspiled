@@ -1,0 +1,112 @@
+<html>
+    <head>
+        <title>Raspiled</title>
+        <link rel="stylesheet" id="style" href="/static/css/raspiled.css">
+        <script src="/static/js/iro.min.js"></script>
+        <script src="/static/js/jquery3.min.js"></script>
+        <script src="/static/js/raspiled.js"></script>
+        <script src="/static/js/picker.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/3.1.9-1/crypto-js.js"></script>
+        <link rel="stylesheet" id="style" href="/static/css/picker.css">
+        <script>
+            //Load our colour-picker
+            $(document).ready(function(e){{
+                $.fn.init_colourpicker("{current_hex}");
+            }});
+        </script>
+    </head>
+
+    <body>
+        <div class='center singin'>
+            <div class="inner">
+            <h2>Welcome to </h2>
+            <div class="logo">
+                <img src="./static/figs/raspiled.svg">
+            </div>
+            <div id="user_data">
+                <p>User:</p> 
+                <input type="text" name="user" id='user'>
+                <p>Password:</p>
+                <input type="password" name="password" id='pswd' required ><br>
+                <button class='sign_in_preset clickme'>Log in!</button>
+            </div>
+            <div id='server_authentication' style='display:    none'>
+                <div class='message' id='message'></div>
+                <div class='authenticate' id='authenticate'>
+            </div>
+            <button class="auth_preset clickme">Authenticate!</button>
+            </div>
+        </div>
+        </div>
+    </body>
+    <script>
+    //Sing in:
+$(document).ready(function(){
+        $(".sign_in_preset").on("click", function(e){
+                var user = 'user=' + $('#user').val();
+                var pswd = 'pswd=' + CryptoJS.MD5($('#pswd').val());
+                console.log(user,pswd)
+                $.fn.debounce( //Debounced to prevent excessive AJAX calls
+                $.ajax({
+                    url: "/?"+ user + '&' + pswd,
+                    success: function(data){
+                       console.log(data.accepted,data.error)
+                       if (data.accepted==true){
+                           location.reload();
+                       }
+                       else if (data.error==true){
+                           $('#message').html(data.message)
+                       }
+                       else{
+                           $('#message').html(data.message)
+                           $('#authenticate').append($('<input/>', {
+                               id: 'auth'
+                           }));
+                           $('#server_authentication').show()
+                           $('#user_data').hide()
+                       }
+                    },
+                    error: function(data){
+                        console.log(data)
+                    },
+                    dataType: "json"
+                }),
+            150); //Debounce delay ms
+
+        });
+});
+//Authenticate:
+$(document).ready(function(){
+        $(".auth_preset").on("click", function(e){
+                var ukey = 'ukey=' + $('#auth').val();
+                console.log(ukey)
+                $.fn.debounce( //Debounced to prevent excessive AJAX calls
+                $.ajax({
+                    url: "/?"+ ukey,
+                    success: function(data){
+                       console.log(data.accepted,data.error)
+                       if (data.accepted==true){
+                           location.reload();
+                       }
+                       else if (data.error==true){
+                           $('#message').html(data.message)
+                       }
+                       else{
+                           $('#message').html(data.message)
+                           $('#authenticate').append($('<input/>', {
+                               id: 'auth'
+                           }));
+                           $('.auth_preset').show()
+                       }
+                    },
+                    error: function(data){
+                        console.log(data)
+                    },
+                    dataType: "json"
+                }),
+            150); //Debounce delay ms
+
+        });
+});
+    </script>
+</html>

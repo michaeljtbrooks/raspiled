@@ -9,6 +9,7 @@
         Blue = 468nm
 
     @author: Dr Mike Brooks
+    @Coathor : Josue Martinez Moreno
 """
 from __future__ import unicode_literals
 
@@ -23,6 +24,8 @@ import threading
 import subprocess
 import logging
 import schedule
+import os
+import signal
 from multiprocessing import Process
 logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
                             datefmt='%H:%M:%S',level=logging.INFO)
@@ -170,6 +173,7 @@ class LEDStrip(object):
         self._green_pin = params['green_pin']
         self._blue_pin = params['blue_pin']
         
+        self.p_alarm = []
         #self._red_pin = self.pin_lim(red_pin) 
         #self._green_pin = self.pin_lim(green_pin)
         #self._blue_pin = self.pin_lim(blue_pin)
@@ -720,8 +724,13 @@ class LEDStrip(object):
         """
         logging.info("\tLEDstrip: exiting sequence threads...")
         self.off() #Stops all sequences and fades to black
+        self.teardown_alarm()
         logging.info("\t\t...done")
     
+    def teardown_alarm(self):
+        if self.p_alarm!=[]:
+              [os.kill(p.pid, signal.SIGKILL) for p in self.p_alarm]
+       
     def _colour_loop(self, colours, seconds=None, milliseconds=None, fade=True):
         """
         Loops around the specified colours, changing colour every n seconds or m milliseconds
@@ -770,7 +779,7 @@ class LEDStrip(object):
     rot = rotate #Alias
     huerot = rotate #Alias
     
-    def _sunrise_sunset(self, seconds=None, milliseconds=None, temps=None, hour=None, setting=True):
+    def _sunrise_sunset(self, seconds=None, milliseconds=None, hour=None, freq=None, temps=None, setting=True):
         """
         Silly routine to emulate a sunset
         
@@ -830,26 +839,19 @@ class LEDStrip(object):
             t2 = time.time()
             logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
-            p=[]
+            if self.p_alarm != []:
+                self.teardown_alarm()
+            process_alarm=[]
             for tt in range(0,len(hour)):
                 t0=float(temps[tt+tt*1].split('K')[0])
                 t1=float(temps[tt+tt*1+1].split('K')[0])
                 milliseconds=0
                 proc_hour=hour[tt]
-		data=(proc_hour,t0,t1,FUDGE_FACTOR,'dayly',seconds[tt],milliseconds)
+		alarm_arg=(proc_hour,t0,t1,FUDGE_FACTOR,freq,seconds[tt],milliseconds)
                 
-                p.append(Process(target=self.schedule_alarm,args=data))
-            #p = Pool(len(hour))
-            #p.imap(self.schedule_alarm,data)
-            #    try:
-            #        logging.info("Dayly Alarm at %ss" % proc_hour)
-            #    except KeyboardInterrupt:
-            #        logging.info("Terminating processes")
-            #        [pp.terminate() for pp in p]
-            
-            [pp.start() for pp in p]
-            pid_alarm=[pp.pid for pp in p]
-            return pid_alarm
+                process_alarm.append(Process(target=self.schedule_alarm,args=alarm_arg))
+            [pp.start() for pp in process_alarm] # Start processes in the background which contain the schedule of the alarm
+            self.p_alarm=process_alarm
 
     def sunset(self, seconds=None, milliseconds=None, temps=None):
         """
@@ -863,11 +865,11 @@ class LEDStrip(object):
         """
         return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=False)
 
-    def alarm(self, seconds=None, milliseconds=None, hour=None, temps=None):
+    def alarm(self, seconds=None, milliseconds=None, hour=None, freq=None, temps=None):
         """
         Emulates a sunset
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, temps=temps)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
 
     def dayly_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
         if t_0 > t_1:
@@ -893,15 +895,14 @@ class LEDStrip(object):
              if self._sequence_stop_signal: #Bail if sequence should stop
                  return None
              k = u"%sk" % temp
-             self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
+             self.fade(k, fade_time=2*((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
              x_step += x_step_amount
              check=False
         return
 
     def schedule_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
         if freq=='dayly':
-            print(freq)
-            schedule.every().day.at(hour).do(self.dayly_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds)
+            schedule.every().day.at(hour).do(self.dayly_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds) #schedule alarm depending on the frequency selected by the client.
         else:
             pass
 

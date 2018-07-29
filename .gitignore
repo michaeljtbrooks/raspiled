@@ -11,4 +11,4 @@
 *.txt
 *.pyc
 *.swp
-.whitelist
+.whitelist*
