@@ -658,7 +658,7 @@ class RaspiledControlResource(Resource):
         m_seconds = request.get_param(["seconds","s","morning"], default=10.0, force=float)
         d_seconds = request.get_param(["seconds","s","dawn"], default=10.0, force=float)
         hour = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
-        freq = request.get_param(["freq"], default='dayly', force=float)
+        freq = request.get_param(["freq"], default='daily', force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
         temps = request.get_param(['temp','K'],default=0.0,force=unicode)
         logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), hour[0]))

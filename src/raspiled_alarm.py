@@ -37,7 +37,7 @@ class RaspiledControlAlarm(object):
             self.x_start = 60
             self.x_step_amount = -1
 
-    def dayly_alarm(t):
+    def daily_alarm(t):
         target_time = self.led_strip.clean_time_in_milliseconds(self.seconds, self.milliseconds, default_seconds=1, minimum_milliseconds=1000)
         z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
         x_step = x_start
@@ -56,8 +56,8 @@ class RaspiledControlAlarm(object):
         return
 
     def schedule_alarm(self):
-        if self.frequency=='dayly':
-            schedule.every().day.at(self.hour).do(self.dayly_alarm)
+        if self.frequency=='daily':
+            schedule.every().day.at(self.hour).do(self.daily_alarm)
         else:
             pass
 

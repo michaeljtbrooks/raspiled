@@ -871,7 +871,7 @@ class LEDStrip(object):
         """
         return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
 
-    def dayly_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
+    def daily_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
         if t_0 > t_1:
             temp_step = -100
             x_start = 0
@@ -901,8 +901,8 @@ class LEDStrip(object):
         return
 
     def schedule_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
-        if freq=='dayly':
-            schedule.every().day.at(hour).do(self.dayly_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds) #schedule alarm depending on the frequency selected by the client.
+        if freq=='daily':
+            schedule.every().day.at(hour).do(self.daily_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds) #schedule alarm depending on the frequency selected by the client.
         else:
             pass
 
