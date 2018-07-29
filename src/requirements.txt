@@ -18,3 +18,4 @@ wcwidth==0.1.7
 twisted
 configparser
 schedule==0.5.0
+requests
