@@ -285,19 +285,20 @@ class RaspiledControlResource(Resource):
     """
     Our web page for controlling the LED strips
     """
-    isLeaf = False #Allows us to go into dirs
-    led_strip = None #Populated at init
+    isLeaf = False  # Allows us to go into dirs
+    led_strip = None  # Populated at init
+    _path = None  # If a user wants to hit a dynamic subpage, the path appears here
     
-    #State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
+    # State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
     PARAM_TO_ACTION_MAPPING = (
-        #Stat actions
+        # Stat actions
         ("off", "off"),
         ("stop", "stop"),
         ("set", "set"),
         ("fade", "fade"),
         ("color", "fade"),
         ("colour", "fade"),
-        #Sequences
+        # Sequences
         ("sunrise", "sunrise"),
         ("morning", "sunrise"),
         ("dawn", "sunrise"),
@@ -311,9 +312,13 @@ class RaspiledControlResource(Resource):
         ("huerot", "rotate"),
         ("colors", "rotate"),
         ("colours", "rotate"),
+        # Docs:
+        ("capabilities", "capabilities"),
+        ("capability", "capabilities"),
+        ("status", "status"),
     )
     
-    #State what presets to render:
+    # State what presets to render:
     OFF_PRESET = Preset(label="""<img src="/static/figs/power-button-off.svg" class="icon_power_off"> Off""", display_colour="black", off="")
     PRESETS = {
         "Whites":( #I've had to change the displayed colours from the strip colours for a closer apparent match
@@ -376,6 +381,7 @@ class RaspiledControlResource(Resource):
         """
         Entry point for dynamic pages 
         """
+        self._path = path
         return self
     
     def getChildWithDefault(self, path, request):
@@ -416,10 +422,15 @@ class RaspiledControlResource(Resource):
         
         # Look through the actions if the request key exists, perform that action
         for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
-            if request.has_param(key_name):
-                self.led_strip.stop_current_sequence() #Stop current sequence
+            if request.has_param(key_name) or self._path == key_name:
                 action_func_name = "action__%s" % action_name
-                _colour_result = getattr(self, action_func_name)(request) #Execute that function
+                if action_name in ("capabilities", "status"):  # Something is asking for our capabilities or status
+                    output = getattr(self, action_func_name)(request)  # Execute that function
+                    request.setHeader("Content-Type", "application/json; charset=utf-8")
+                    return json.dumps(output)
+                else:
+                    self.led_strip.stop_current_sequence() #Stop current sequence
+                    _colour_result = getattr(self, action_func_name)(request) #Execute that function
                 break
         
         # Now deduce our colour:
@@ -435,6 +446,7 @@ class RaspiledControlResource(Resource):
                 "current_rgb": current_colour
             }
             try:
+                request.setHeader("Content-Type", "application/json; charset=utf-8")
                 return json.dumps(json_data)
             except (TypeError, ValueError):
                 return b"Raspiled generated invalid JSON data!"
@@ -544,6 +556,14 @@ class RaspiledControlResource(Resource):
         set_colour = request.get_param("set", force=unicode)
         D("Set to: %s" % set_colour)
         return self.led_strip.set(set_colour)
+    action__set.capability = {
+        "param": "set",
+        "description": "Sets the RGB strip to a single colour.",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF.",
+        "widget": "colourpicker",
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__fade(self, request):
         """
@@ -552,6 +572,13 @@ class RaspiledControlResource(Resource):
         fade_colour = request.get_param("fade", force=unicode)
         logging.info("Fade to: %s" % fade_colour)
         return self.led_strip.fade(fade_colour)
+    action__fade.capability = {
+        "param": "fade",
+        "description": "Fades the RGB strip from its current colour to a specified colour.",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF",
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__sunrise(self, request):
         """
@@ -559,9 +586,37 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        temp_start = request.get_param(['temp_start','K'], default=None, force=unicode)
+        temp_end = request.get_param('temp_end', default=None, force=unicode)
         logging.info("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temps=temps)
+        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
+    action__sunrise.capability = {
+        "param": "sunrise",
+        "description": "Gently fades-in the RGB strip from deep red to daylight.",
+        "value": "The number of seconds you would like the sunrise to take.",
+        "validity": "<float> > 0",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the sunrise should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "1000",
+            },
+            {
+                "param": "temp_start",
+                "value": "The colour temperature you wish to start from (e.g. 500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "6500K"
+            },
+            {
+                "param": "temp_end",
+                "value": "The colour temperature you wish to finish at (e.g. 4500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "500K"
+            }
+        ],
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__sunset(self, request):
         """
@@ -569,9 +624,37 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
+        temp_end = request.get_param('temp_end', default=None, force=unicode)
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
+        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
+    action__sunset.capability = {
+        "param": "sunset",
+        "description": "Gently fades-out the RGB strip from daylight to deep-red.",
+        "value": "The number of seconds you would like the sunrise to take.",
+        "validity": "<float> > 0",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the sunset should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "1000",
+            },
+            {
+                "param": "temp_start",
+                "value": "The colour temperature you wish to start from (e.g. 500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "500K"
+            },
+            {
+                "param": "temp_end",
+                "value": "The colour temperature you wish to finish at (e.g. 4500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "6500K"
+            }
+        ],
+        "returns": ""
+    }
     
     def action__jump(self, request):
         """
@@ -584,7 +667,28 @@ class RaspiledControlResource(Resource):
         total_seconds = (seconds + (milliseconds/1000.0))
         logging.info("Jump: %s, %s seconds" % (jump_colours, total_seconds))
         return self.led_strip.jump(jump_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
-    
+    action__jump.capability = {
+        "param": "jump",
+        "description": "Hops from one colour to the next over an even period of time.",
+        "value": "A comma delimited list of colours you wish to jump between.",
+        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the each colour should be displayed for. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "200",
+            },
+            {
+                "param": "seconds",
+                "value": "The number of seconds each colour should be displayed for. Will be added to milliseconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "0",
+            },
+        ],
+        "returns": "<unicode> The first hex value of sequence."
+    }
+
     def action__rotate(self, request):
         """
         Rotates (fades) from one specified colour to the next
@@ -596,12 +700,39 @@ class RaspiledControlResource(Resource):
         total_seconds = (seconds + (milliseconds/1000.0))
         logging.info("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
         return self.led_strip.rotate(rotate_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
-    
+    action__rotate.capability = {
+        "param": "rotate",
+        "description": "Fades from one colour to the next over an even period of time.",
+        "value": "A comma delimited list of colours you wish to cross-fade between.",
+        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the each colour fade should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "200",
+            },
+            {
+                "param": "seconds",
+                "value": "The number of seconds each colour fade should take. Will be added to milliseconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "0",
+            },
+        ],
+        "returns": "<unicode> The first hex value of sequence."
+    }
+
     def action__stop(self, request):
         """
         Stops the current sequence
         """
         return self.led_strip.stop()
+    action__stop.capability = {
+        "param": "stop",
+        "description": "Halts the current sequence or fade.",
+        "value": "",
+        "returns": "<unicode> The hex value of colour the RGB strip got halted on."
+    }
     
     def action__off(self, request):
         """
@@ -609,6 +740,36 @@ class RaspiledControlResource(Resource):
         """
         logging.info("Off!")
         return self.led_strip.off()
+    action__off.capability = {
+        "param": "off",
+        "description": "Stops any fades or sequences. Quickly Fades the RGB strip to black (no light)",
+        "value": "",
+        "returns": "<unicode> The hex value of colour the RGB strip ends up at (#000000)."
+    }
+
+    def action__capabilities(self, request, *args, **kwargs):
+        """
+        Reports this listener's capabilities
+        """
+        output_capabilities = []
+        for function_name in dir(self):
+            if function_name.startswith("action__"):
+                try:
+                    capability_details = getattr(self,function_name).capability
+                    output_capabilities.append(capability_details)
+                except AttributeError:
+                    pass
+        return output_capabilities
+
+    def action__status(self, request, *args, **kwargs):
+        """
+        Reports the status of the RGB LED strip
+        """
+        return {
+            "current": self.led_strip.hex,
+            "contrast": self.led_strip.contrast_from_bg(self.led_strip.hex, dark_default="202020"),
+            "current_rgb": "({})".format(self.led_strip)
+        }
     
     def teardown(self):
         """
@@ -637,8 +798,13 @@ class SmartRequest(Request, object):
             
             #If you want a whole list of values
             jump = request.get_list("jump")
-            
+
+    See docs: https://twistedmatrix.com/documents/8.0.0/api/twisted.web.server.Request.html
+
     """
+    def __init__(self, *args, **kwargs):
+        super(SmartRequest, self).__init__(*args, **kwargs)
+
     def get_param_values(self, name, default=None):
         """
         Failsafe way of getting querystring get and post params from the Request object

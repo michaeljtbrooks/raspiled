@@ -769,7 +769,7 @@ class LEDStrip(object):
     rot = rotate #Alias
     huerot = rotate #Alias
     
-    def _sunrise_sunset(self, seconds=None, milliseconds=None, temps=None,setting=True):
+    def _sunrise_sunset(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None, setting=True):
         """
         Silly routine to emulate a sunset
         
@@ -782,31 +782,54 @@ class LEDStrip(object):
         We have 60 steps, so we can apply limits on x (0 to 60). We end up with:
         
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
+
+        @keyword seconds: <float> Number of seconds to do the sequence over
+        @keyword milliseconds: <float> Number of milliseconds to do the sequence over, gets added to seconds if both provided
+        @keyword temp_start: <unicode> A colour temperature (in Kelvin) to start the sequence from
+        @keyword temp_end: <unicode> A colour temperature (in Kelvin) to end the sequence at
+        @keyword fade: <Boolean> whether to fade between steps (True) or jump (False)
         """
-        #logging.info("Running sunrise/sunset.... ")
-        if temps==None and setting==True:
-            t0= 6500
+
+        # Work out what the defaults should be
+        if setting is True:
+            t0 = 6500
             t1 = 500
-        elif temps==None and setting==False:
-            t0= 500
+        elif setting is False:
+            t0 = 500
             t1 = 6500
-        else:
-            t0=temps[0].split('K')[0]
-            t1=temps[1].split('K')[0]
+
+        # You can override these defaults if either temp_start or temp_end is set
+        if temp_start:
+            try:
+                _exists = NAMED_COLOURS[temp_start]
+                t0 = temp_start.rstrip('K')
+            except (TypeError,ValueError):  # Means the starting temp has NOT been provided, use default
+                pass
+            except KeyError:
+                logging.warning("Sunrise/sunset: Your starting colour temperature '{}' is not a valid colour temperature".format(temp_start))
+        if temp_end:
+            try:
+                _exists = NAMED_COLOURS[temp_end]
+                t1 = temp_end.rstrip('K')
+            except (TypeError, ValueError):  # Means the ending temp has NOT been provided, use default
+                pass
+            except KeyError:
+                logging.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
+
+        #print("{} > {}".format(t0,t1))
+
         if t0 > t1:
             temp_0 = int(t0)
             temp_n = int(t1)
             temp_step = -100
             x_start = 0
             x_step_amount = 1
-            #logging.info("Sunsetting...")
         else:
             temp_0 = int(t0)
             temp_n = int(t1)
             temp_step = 100
             x_start = 60
             x_step_amount = -1
-            #logging.info("Sun rising...")
         
         #Add in a fudge factor to cater for CPU doing other things:
         FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
@@ -830,16 +853,16 @@ class LEDStrip(object):
         t2 = time.time()
         logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
     
-    def sunset(self, seconds=None, milliseconds=None, temps=None):
+    def sunset(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None):
         """
         Emulates a sunset, run in a separate thread
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=True)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end, setting=True)
 
-    def sunrise(self, seconds=None, milliseconds=None, temps=None):
+    def sunrise(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None):
         """
         Emulates a sunset
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=False)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end, setting=False)
 
 
