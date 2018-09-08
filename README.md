@@ -1,6 +1,6 @@
 # Raspiled #
 
-Raspberry Pi driven RGB LED strips
+Raspberry Pi driven RGB LED strips (updated 08 Sep 2018: bugfixes and faster page rendering)
 
 ![Raspiled Web Interface](https://github.com/michaeljtbrooks/raspiled/blob/master/docs/Raspiled_web_interface.png)
 
