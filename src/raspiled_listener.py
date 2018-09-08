@@ -421,8 +421,9 @@ class RaspiledControlResource(Resource):
         _colour_result = None
         
         # Look through the actions if the request key exists, perform that action
+        clean_path = unicode(self._path or u"").rstrip("/")
         for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
-            if request.has_param(key_name) or self._path == key_name:
+            if request.has_param(key_name) or clean_path == key_name:
                 action_func_name = "action__%s" % action_name
                 if action_name in ("capabilities", "status"):  # Something is asking for our capabilities or status
                     output = getattr(self, action_func_name)(request)  # Execute that function
