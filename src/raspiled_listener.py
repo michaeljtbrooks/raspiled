@@ -17,6 +17,7 @@ import os
 from subprocess import check_output, CalledProcessError
 import time
 from twisted.internet import reactor, endpoints,protocol
+from twisted.protocols import basic
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
@@ -41,53 +42,98 @@ logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
 
 RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
 
+
+
 DEFAULTS = {
         'config_path' : RASPILED_DIR,
         'pi_host'     : 'localhost',
-        'pi_port'     : 9090,
-        'pig_port'    : 8888,
-        'red_pin'     : '',
-        'green_pin'   : '',
-        'blue_pin'    : ''
-            }
+        'pi_port'     : 9090,   # the port our web server listens on (192.168.0.33:<pi_port>)
+        'pig_port'    : 8888,   # the port pigpio daemon is listening on for pin control commands
+        'latitude'    : 52.2053,  # If you wish to sync your sunrise/sunset to the real sun, enter your latitude as a decimal
+        'longitude'    : 0.1218,  # If you wish to sync your sunrise/sunset to the real sun, enter your longitude as a decimal
+
+        # Initial default values for your output pins. You can override them in your raspiled.conf file
+        'red_pin'     : '17',
+        'green_pin'   : '22',
+        'blue_pin'    : '24'
+}
 
 config_path = os.path.expanduser(RASPILED_DIR+'/raspiled.conf')
 parser = configparser.ConfigParser(defaults=DEFAULTS)
+params = {}
 
 if os.path.exists(config_path):
     logging.info('Using config file: {}'.format(config_path))
     parser.read(config_path)
+    params = Odict2int(parser.defaults())
+    config_file_needs_writing = False
 else:
+    config_file_needs_writing = True
+    # No config file exists, give the user a chance to specify their pin configuration
     logging.warn('No config file found. Creating default {} file.'.format(config_path))
     logging.warn('*** Please edit this file as needed. ***')
-    
-    while True:
-        try:
-            DEFAULTS['red_pin']=input('RED pin number:')
-            DEFAULTS['green_pin']=input('GREEN pin number:')
-            DEFAULTS['blue_pin']=input('BLUE pin number:')
 
-            if (DEFAULTS['red_pin']==DEFAULTS['blue_pin'] 
-	      or DEFAULTS['red_pin']==DEFAULTS['green_pin'] 
-	      or DEFAULTS['green_pin']==DEFAULTS['blue_pin']):
-	        logging.warn('*** The pin number should be different for all pins. ***')
-	    else:
-	        logging.info('Configuration Finished.')
-	        break
-        except:
-	    logging.warn('*** The input should be an integer ***')
+    # Allow user to customise their pin config
+    while True:
+        try:  # These will assume the default settings UNLESS you enter a different value
+            user_input_red_pin = int(input('RED pin number [{}]:'.format(DEFAULTS["red_pin"])) or DEFAULTS["red_pin"])
+            user_input_green_pin = int(input('GREEN pin number [{}]:'.format(DEFAULTS["green_pin"])) or DEFAULTS["green_pin"])
+            user_input_blue_pin = int(input('BLUE pin number [{}]:'.format(DEFAULTS["blue_pin"])) or DEFAULTS["blue_pin"])
+        except (ValueError, TypeError):
+            logging.warn('*** The input should be an integer ***')
+        else:
+            DEFAULTS['red_pin'] = user_input_red_pin
+            DEFAULTS['green_pin'] = user_input_green_pin
+            DEFAULTS['blue_pin'] = user_input_blue_pin
+            if DEFAULTS['red_pin'] == DEFAULTS['blue_pin'] or DEFAULTS['red_pin'] == DEFAULTS['green_pin'] or DEFAULTS['green_pin'] == DEFAULTS['blue_pin']:
+                logging.warn('*** The pin number should be different for all pins. ***')
+            else:
+                config_file_needs_writing = True
+                break
+
+# Check that our ports are sane:
+user_pi_port = params.get("pi_port", DEFAULTS["pi_port"])
+user_pig_port = params.get("pig_port", DEFAULTS["pig_port"])
+while True:
+    config_is_ok = True
+    try:
+        if int(user_pi_port) == int(user_pig_port):
+            config_is_ok = False
+            raise RuntimeError("*** You cannot have the web server running on port {} while the pigpio daemon is also running on that port! ***".format(DEFAULTS["pi_port"]))
+    except RuntimeError as e:
+        logging.warn(e)
+    except (ValueError, TypeError):
+        logging.warn("*** You have specified an invalid port number for the Raspiled web server ({}) or the Pigpio daemon ({}) ***".format(DEFAULTS["pi_port"], DEFAULTS["pig_port"]))
+    else:  # Config is fine... carry on
+        DEFAULTS["pi_port"] = user_pi_port
+        DEFAULTS["pig_port"] = user_pig_port
+        break
+
+    try:
+        user_pi_port = int(input('Raspiled web server port (e.g. 9090) [{}]:'.format(DEFAULTS["pi_port"])) or DEFAULTS["pi_port"])
+        user_pig_port = int(input('Pigpio daemon port (e.g. 8888) [{}]:'.format(DEFAULTS["pig_port"])) or DEFAULTS["pig_port"])
+    except (ValueError, TypeError):
+        logging.warn('*** The input should be an integer ***')
+    else:
+        config_file_needs_writing = True
+
+
+# Now write the config file if needed
+if config_file_needs_writing:
     parser = configparser.ConfigParser(defaults=DEFAULTS)
     with open(config_path, 'w') as f:
         parser.write(f)
+    params = Odict2int(parser.defaults())
 
-params = Odict2int(parser.defaults())
+
+RESOLVED_USER_SETTINGS = params  # Alias for clarity
 
 DEBUG = False
+
 
 def D(item):
     if DEBUG:
         logging.info(item)
-
 
 
 class Preset(object):
@@ -113,8 +159,7 @@ class Preset(object):
         self.is_sun = is_sun
         self.args = args
         self.kwargs = kwargs
-       
-    
+
     def __repr__(self):
         """
         Says what this is
@@ -227,6 +272,7 @@ class Preset(object):
         )
         return html
 
+
 class PresetSpace(object):
     """
     Simply spaces presets apart!
@@ -268,7 +314,7 @@ class RaspiledControlResource(Resource):
     )
     
     #State what presets to render:
-    OFF_PRESET = Preset(label="&#x23FB; Off", display_colour="black", off="")
+    OFF_PRESET = Preset(label="""<img src="/static/figs/power-button-off.svg" class="icon_power_off"> Off""", display_colour="black", off="")
     PRESETS = {
         "Whites":( #I've had to change the displayed colours from the strip colours for a closer apparent match
                 Preset(label="Candle", display_colour="1500K", fade="1000K"),
@@ -300,12 +346,12 @@ class RaspiledControlResource(Resource):
                 Preset(label="Cyan", display_colour="#00FFFF", fade="#00FFFF"),
                 Preset(label="Blue", display_colour="#0088FF", fade="#0088FF"),
                 Preset(label="Indigo", display_colour="#0000FF", fade="#0000FF"),
-                Preset(label="Purple", display_colour="#8800FF", fade="#7A00FF"), #There's a difference!
+                Preset(label="Purple", display_colour="#8800FF", fade="#7A00FF"),  # There's a difference!
                 Preset(label="Magenta", display_colour="#FF00FF", fade="#FF00FF"),
                 Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             ),
         "Sequences":(
-                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="700K,500K,1100K,600K,800K,1000K,500K,1200K", milliseconds="1800", is_sequence=True),
+                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="900K,1000K,500K,1700K,1100K,500K,1300K,1100K,1000K,800K,1300K,900K,1000K,600K,800K,600K,600K,700K,700K,1500K,700K,1000K,1100K,1100K,800K,1000K,1300K,500K,700K,1800K,600K,1000K,800K,1400K,1100K,1100K,1100K,600K,1800K,800K,1300K,900K,500K,600K,1300K,900K,800K,900K", milliseconds="120", is_sequence=True),
                 Preset(label="&#x1f41f; Fish tank", display_gradient=("#00FF88","#0088FF","#007ACC","#00FFFF"), rotate="00FF88,0088FF,007ACC,00FFFF", milliseconds="2500", is_sequence=True),
                 Preset(label="&#x1f389; Party", display_gradient=("cyan","yellow","magenta"), rotate="cyan,yellow,magenta", milliseconds="1250", is_sequence=True),
                 Preset(label="&#x1f33b; Flamboyant", display_gradient=("yellow","magenta"), jump="yellow,magenta", milliseconds="150", is_sequence=True),
@@ -314,17 +360,17 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
     }
-    PRESETSCopy= copy.deepcopy(PRESETS) #Modifiable dictionary. Used in alarms and music.
+    PRESETS_COPY = copy.deepcopy(PRESETS)  # Modifiable dictionary. Used in alarms and music.
 
     def __init__(self, *args, **kwargs):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
-        self.led_strip = LEDStrip(params)
+        self.led_strip = LEDStrip(RESOLVED_USER_SETTINGS)
         Resource.__init__(self, *args, **kwargs) #Super
-        #Add in the static folder
+        # Add in the static folder.
         static_folder = os.path.join(RASPILED_DIR,"static")
-        self.putChild("static", File(static_folder))
+        self.putChild("static", File(static_folder))  # Any requests to /static serve from the filesystem.
     
     def getChild(self, path, request, *args, **kwargs):
         """
@@ -352,11 +398,23 @@ class RaspiledControlResource(Resource):
     
     def render_GET(self, request):
         """
-        Responds to GET requests
+        MAIN WEB PAGE ENTRY POINT
+            Responds to GET requests
+
+            If a valid action in the GET querystring is present, that action will get performed and
+            the web server will return a JSON response. The assumption is that a javascript function is calling
+            this web server to act as an API
+
+            If a human being arrives at the web server without providing a valid action in the GET querystring,
+            they'll just be given the main html page which shows all the buttons.
+
+        @param request: The http request, passed in from Twisted, which will be an instance of <SmartRequest>
+
+        @return: HTML or JSON depending on if there is no action or an action.
         """
         _colour_result = None
         
-        #Look through the actions if the request key exists, perform that action
+        # Look through the actions if the request key exists, perform that action
         for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
             if request.has_param(key_name):
                 self.led_strip.stop_current_sequence() #Stop current sequence
@@ -364,12 +422,12 @@ class RaspiledControlResource(Resource):
                 _colour_result = getattr(self, action_func_name)(request) #Execute that function
                 break
         
-        #Now deduce our colour:
+        # Now deduce our colour:
         current_colour = "({})".format(self.led_strip)
         current_hex = self.led_strip.hex
         contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
         
-        #Return a JSON object if a result:
+        # Return a JSON object if an action has been performed (i.e. _colour_result is set):
         if _colour_result is not None:
             json_data = {
                 "current" : current_hex,
@@ -378,15 +436,14 @@ class RaspiledControlResource(Resource):
             }
             try:
                 return json.dumps(json_data)
-            except:
-                return b"Json fkucked up"
+            except (TypeError, ValueError):
+                return b"Raspiled generated invalid JSON data!"
         
-        #Otherwise return normal page
+        # Otherwise, we've not had an action, so return normal page
         request.setHeader("Content-Type", "text/html; charset=utf-8")
-        htmlstr=''
-        with open(RASPILED_DIR+'/static/index.html') as file:
-            for line in file:
-                 htmlstr+=line
+        htmlstr = ''
+        with open(RASPILED_DIR+'/static/index.html') as index_html_template:
+            htmlstr = index_html_template.read()  # 2018-09-08 It's more efficient to pull the whole file in
         return htmlstr.format(
                 current_colour=current_colour,
                 current_hex=current_hex,
@@ -397,10 +454,15 @@ class RaspiledControlResource(Resource):
                 music_html=self.udevelop_presets(request),
                 controls_html=self.udevelop_presets(request)
             ).encode('utf-8')
-    
+
+    #### Additional pages available via the menu ####
+
     def light_presets(self, request):
         """
         Renders the light presets as options
+
+        @param request: The http request object
+
         """
         out_html_list = []
         for group_name, presets in self.PRESETS.items():
@@ -432,7 +494,7 @@ class RaspiledControlResource(Resource):
        preset_list = []
        #Inner for
        group_name="Sunrise / Sunset"
-       presets=self.PRESETSCopy[group_name]
+       presets=self.PRESETS_COPY[group_name]
        for preset in presets:
             try:
                 if preset.display_gradient[0]=='5000K':
@@ -446,7 +508,7 @@ class RaspiledControlResource(Resource):
        group_html = """
                 <p id="clock" class="current-colour"></p>
                 <h2>{group_name}</h2>
-                <div class="sun-alarm"></div>
+                <div class="sun-alarm" data-latitude="{users_latitude}" data-longitude="{users_longitude}"></div>
                 <div class="preset_group">
                     <div class="presets_row">
                         {preset_html}
@@ -454,7 +516,9 @@ class RaspiledControlResource(Resource):
                 </div>
             """.format(
                 group_name = group_name,
-                preset_html = "\n".join(preset_list)
+                preset_html = "\n".join(preset_list),
+                users_latitude = RESOLVED_USER_SETTINGS.get("latitude", DEFAULTS.get("latitude", 52.2053)),
+                users_longitude = RESOLVED_USER_SETTINGS.get("longitude", DEFAULTS.get("longitude", 0.1218))
             )
        out_html_list.append(group_html)
        out_html = "\n".join(out_html_list)
@@ -470,6 +534,8 @@ class RaspiledControlResource(Resource):
            </div>
        """
        return out_html
+
+    #### Actions: These are the actions our web server can initiate. Triggered by hitting the url with ?action_name=value ####
 
     def action__set(self, request):
         """
@@ -708,38 +774,11 @@ def checkClientAgainstWhitelist(ip, user,token):
             connection = False
     return connection
 
-from twisted.protocols import basic
 
-class RaspiledProtocol(basic.LineReceiver):#protocol.Protocol):
-    #def __init__(self, factory):
-         #super(RaspiledProtocol, self).__init__(factory=factory)
-    #     self.factory = factory
-     
-
-
-    #    reactor.stop()    
-    #def connectionMade(self):
-    #    self.transport.pauseProducing()
-    #    ip, port = self.transport.client
-         
-    #    result = checkClientAgainstWhitelist(ip,'lsls','token' )
-    #    if result == False:
-    #        logging.warn(('Client attempting to access: IP - {}, Port - {}'.format(ip,port)))
-    #        self.transport.loseConnection()
-    #     else:
-    #        logging.info(('Client connection: IP {}, Port {}'.format(ip,port)))
-    #        self.transport.resumeProducing()
-    #        return RaspiledControlResource
-         #self.factory.numProtocols = self.factory.numProtocols+1 
-         #self.transport.write(
-         #    "Welcome! There are currently %d open connections.\n" %
-         #    (self.factory.numProtocols,))
-    #def connectionLost(self, reason):
-    #    logging.info('Lost connection')
-        #self.transport.loseConnection()
-        #self.factory.numProtocols = self.factory.numProtocols-1
-    #def dataReceived(self,data):
-    #    print(data)
+class RaspiledProtocol(basic.LineReceiver):
+    """
+    Twisted Protocol to handle HTTP connections
+    """
 
     def __init__(self):
         self.lines = []
@@ -756,21 +795,6 @@ class RaspiledProtocol(basic.LineReceiver):#protocol.Protocol):
         self.transport.write(responseBody)
         self.transport.loseConnection()
 
-    #def sendResponse(self):
-    #    self.sendLine("HTTP/1.1 200 OK")
-    #    self.sendLine("")
-    #    responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
-    #    self.transport.write(responseBody)
-    #    self.transport.loseConnection()
-        #self.transport.write(data)
-        #apass  
-    #def autentication():
-    #    def __init__(self, username, server, clientref):
-    #        self.name = username
-    #        self.server = password
-    #        self.key = key
-    #def dataReceived(self, data):
-        #self.transport.write(data)
 
 class HTTPEchoFactory(protocol.ServerFactory):
     def buildProtocol(self, addr):
@@ -784,32 +808,15 @@ def start_if_not_running():
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
-        ##resource = RaspiledControlSite()
-        
-	#factory = protocol.ServerFactory()        
         factory = RaspiledControlSite(timeout=8) #8s timeout
-#        print(factory.protocol.transport.client)
-        #factory.protocol = RaspiledProtocol#(factory)
-        #endpoint.connect(factory)
-        endpoint = endpoints.TCP4ServerEndpoint(reactor, params['pi_port'])
-        #endpoint.listen(RaspiledProtocol)
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, RESOLVED_USER_SETTINGS['pi_port'])
         endpoint.listen(factory)
         reactor.run()
-#        reactor.listenTCP(9090, HTTPEchoFactory())
-#        reactor.run()
     else:
         logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
+
 
 if __name__=="__main__":
     start_if_not_running()
 
 
-#f = protocol.ServerFactory()
-#f.protocol = MyProtocol
-#reactor.listenTCP(9111, f)
-#reactor.run()
-
-
-#ip, port = self.transport.client
-#print ip
-#print port
