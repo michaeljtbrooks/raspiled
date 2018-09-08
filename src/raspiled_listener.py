@@ -356,7 +356,7 @@ class RaspiledControlResource(Resource):
                 Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             ),
         "Sequences":(
-                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="900K,1000K,500K,1700K,1100K,500K,1300K,1100K,1000K,800K,1300K,900K,1000K,600K,800K,600K,600K,700K,700K,1500K,700K,1000K,1100K,1100K,800K,1000K,1300K,500K,700K,1800K,600K,1000K,800K,1400K,1100K,1100K,1100K,600K,1800K,800K,1300K,900K,500K,600K,1300K,900K,800K,900K", milliseconds="120", is_sequence=True),
+                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="1100K,800K,1100K,1300K,1300K,900K,1500K,800K,900K,800K,1300K,600K,600K,600K,900K,600K,900K,1100K,1400K,1400K,900K,800K,600K,700K,700K,900K,1000K,1000K,800K,900K,1000K,700K,900K,1000K,600K,700K,1000K,800K,800K,1400K,900K,1100K,1000K,1500K,1000K,1000K,900K,700K", milliseconds="80", is_sequence=True),
                 Preset(label="&#x1f41f; Fish tank", display_gradient=("#00FF88","#0088FF","#007ACC","#00FFFF"), rotate="00FF88,0088FF,007ACC,00FFFF", milliseconds="2500", is_sequence=True),
                 Preset(label="&#x1f389; Party", display_gradient=("cyan","yellow","magenta"), rotate="cyan,yellow,magenta", milliseconds="1250", is_sequence=True),
                 Preset(label="&#x1f33b; Flamboyant", display_gradient=("yellow","magenta"), jump="yellow,magenta", milliseconds="150", is_sequence=True),
