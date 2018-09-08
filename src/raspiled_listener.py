@@ -53,9 +53,9 @@ DEFAULTS = {
         'longitude'    : 0.1218,  # If you wish to sync your sunrise/sunset to the real sun, enter your longitude as a decimal
 
         # Initial default values for your output pins. You can override them in your raspiled.conf file
-        'red_pin'     : '17',
-        'green_pin'   : '22',
-        'blue_pin'    : '24'
+        'red_pin'     : '27',
+        'green_pin'   : '17',
+        'blue_pin'    : '22'
 }
 
 config_path = os.path.expanduser(RASPILED_DIR+'/raspiled.conf')
