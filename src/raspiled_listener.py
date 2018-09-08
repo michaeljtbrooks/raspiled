@@ -49,6 +49,8 @@ DEFAULTS = {
         'pi_host'     : 'localhost',
         'pi_port'     : 9090,   # the port our web server listens on (192.168.0.33:<pi_port>)
         'pig_port'    : 8888,   # the port pigpio daemon is listening on for pin control commands
+        'latitude'    : 52.2053,  # If you wish to sync your sunrise/sunset to the real sun, enter your latitude as a decimal
+        'longitude'    : 0.1218,  # If you wish to sync your sunrise/sunset to the real sun, enter your longitude as a decimal
 
         # Initial default values for your output pins. You can override them in your raspiled.conf file
         'red_pin'     : '17',
@@ -103,7 +105,6 @@ while True:
     except (ValueError, TypeError):
         logging.warn("*** You have specified an invalid port number for the Raspiled web server ({}) or the Pigpio daemon ({}) ***".format(DEFAULTS["pi_port"], DEFAULTS["pig_port"]))
     else:  # Config is fine... carry on
-        config_file_needs_writing = True
         DEFAULTS["pi_port"] = user_pi_port
         DEFAULTS["pig_port"] = user_pig_port
         break
@@ -113,6 +114,8 @@ while True:
         user_pig_port = int(input('Pigpio daemon port (e.g. 8888) [{}]:'.format(DEFAULTS["pig_port"])) or DEFAULTS["pig_port"])
     except (ValueError, TypeError):
         logging.warn('*** The input should be an integer ***')
+    else:
+        config_file_needs_writing = True
 
 
 # Now write the config file if needed
@@ -121,6 +124,9 @@ if config_file_needs_writing:
     with open(config_path, 'w') as f:
         parser.write(f)
     params = Odict2int(parser.defaults())
+
+
+RESOLVED_USER_SETTINGS = params  # Alias for clarity
 
 DEBUG = False
 
@@ -345,7 +351,7 @@ class RaspiledControlResource(Resource):
                 Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             ),
         "Sequences":(
-                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="700K,500K,1100K,600K,800K,1000K,500K,1200K", milliseconds="1800", is_sequence=True),
+                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="900K,1000K,500K,1700K,1100K,500K,1300K,1100K,1000K,800K,1300K,900K,1000K,600K,800K,600K,600K,700K,700K,1500K,700K,1000K,1100K,1100K,800K,1000K,1300K,500K,700K,1800K,600K,1000K,800K,1400K,1100K,1100K,1100K,600K,1800K,800K,1300K,900K,500K,600K,1300K,900K,800K,900K", milliseconds="120", is_sequence=True),
                 Preset(label="&#x1f41f; Fish tank", display_gradient=("#00FF88","#0088FF","#007ACC","#00FFFF"), rotate="00FF88,0088FF,007ACC,00FFFF", milliseconds="2500", is_sequence=True),
                 Preset(label="&#x1f389; Party", display_gradient=("cyan","yellow","magenta"), rotate="cyan,yellow,magenta", milliseconds="1250", is_sequence=True),
                 Preset(label="&#x1f33b; Flamboyant", display_gradient=("yellow","magenta"), jump="yellow,magenta", milliseconds="150", is_sequence=True),
@@ -360,7 +366,7 @@ class RaspiledControlResource(Resource):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
-        self.led_strip = LEDStrip(params)
+        self.led_strip = LEDStrip(RESOLVED_USER_SETTINGS)
         Resource.__init__(self, *args, **kwargs) #Super
         # Add in the static folder.
         static_folder = os.path.join(RASPILED_DIR,"static")
@@ -502,7 +508,7 @@ class RaspiledControlResource(Resource):
        group_html = """
                 <p id="clock" class="current-colour"></p>
                 <h2>{group_name}</h2>
-                <div class="sun-alarm"></div>
+                <div class="sun-alarm" data-latitude="{users_latitude}" data-longitude="{users_longitude}"></div>
                 <div class="preset_group">
                     <div class="presets_row">
                         {preset_html}
@@ -510,7 +516,9 @@ class RaspiledControlResource(Resource):
                 </div>
             """.format(
                 group_name = group_name,
-                preset_html = "\n".join(preset_list)
+                preset_html = "\n".join(preset_list),
+                users_latitude = RESOLVED_USER_SETTINGS.get("latitude", DEFAULTS.get("latitude", 52.2053)),
+                users_longitude = RESOLVED_USER_SETTINGS.get("longitude", DEFAULTS.get("longitude", 0.1218))
             )
        out_html_list.append(group_html)
        out_html = "\n".join(out_html_list)
@@ -801,7 +809,7 @@ def start_if_not_running():
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
         factory = RaspiledControlSite(timeout=8) #8s timeout
-        endpoint = endpoints.TCP4ServerEndpoint(reactor, params['pi_port'])
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, RESOLVED_USER_SETTINGS['pi_port'])
         endpoint.listen(factory)
         reactor.run()
     else:

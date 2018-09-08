@@ -126,6 +126,8 @@ $('.menu_click').click(function(e){
     }
 });
 
+
+// Updates the time on the Alarm screen to the current time
 var timeInterval = setInterval(function() {
   TimeClock();
 }, 1000);
@@ -135,33 +137,52 @@ function TimeClock() {
   document.getElementById("clock").innerHTML = d.toLocaleTimeString();
 }
 
+
+function TimeStringToTime(timestring){
+    // Converts a time string from sunrise-sunset into an interpretable string
+    var timeparts = timestring.split(":");
+    if(timestring.includes("PM")){
+        var hours = Number(timeparts[0]) + 12;
+    } else {
+        var hours = Number(timeparts[0]);
+    }
+    var minutes = Number(timeparts[1]);
+    return hours+":"+minutes;
+}
+
+
 // Determines the user's current location, then states sunrise and sunset for it
 $(document).ready(function(){
-    $.getJSON( "https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&date=today", {
+    // Resolve lat/lon from the sun-alarm DOM object
+    var $sun_alarm = $(".sun-alarm").first();
+    var latitude = $sun_alarm.data("latitude");
+    var longitude = $sun_alarm.data("longitude");
+
+    $.getJSON( "https://api.sunrise-sunset.org/json?lat="+latitude+"&lng="+longitude+"&date=today", {
         tags: "sunrise sunset",
         tagmode: "any",
         format: "json"
      }).done(function( data ) {
-         sunrise=data.results.sunrise
-         sunset =data.results.sunset
-         $( ".sun-alarm" ).append('<input type="Sunrise Alarm" class="form-control sunrise-picker" value="'+sunrise.split(":")[0]+':'+sunrise.split(":")[1]+'" ><input type="Sunset Alarm" class="form-control sunset-picker" value="'+sunset.split(":")[0]+':'+sunset.split(":")[1]+'">')
+         var sunrise = TimeStringToTime(data.results.sunrise);
+         var sunset = TimeStringToTime(data.results.sunset);
+         $( ".sun-alarm" ).append('<input type="Sunrise Alarm" class="form-control sunrise-picker" value="'+sunrise+'" ><input type="Sunset Alarm" class="form-control sunset-picker" value="'+sunset+'">');
 
-     new Picker(document.querySelector('.sunrise-picker'), {
-         format: 'HH:mm',
-         text: {
-            title: 'Sunrise',
-            cancel: 'Cancel',
-            confirm: 'Confirm',
-         }
-     });
+         new Picker(document.querySelector('.sunrise-picker'), {
+             format: 'HH:mm',
+             text: {
+                title: 'Sunrise',
+                cancel: 'Cancel',
+                confirm: 'Confirm',
+             }
+         });
 
-     new Picker(document.querySelector('.sunset-picker'), {
-         format: 'HH:mm',
-         text: {
-            title: 'Sunset',
-            cancel: 'Cancel',
-            confirm: 'Confirm',
-         }
-     });
+         new Picker(document.querySelector('.sunset-picker'), {
+             format: 'HH:mm',
+             text: {
+                title: 'Sunset',
+                cancel: 'Cancel',
+                confirm: 'Confirm',
+             }
+         });
      });
 })
