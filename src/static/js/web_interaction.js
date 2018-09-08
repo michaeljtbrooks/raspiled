@@ -87,7 +87,7 @@ document.addEventListener('mousemove', function(event) {
 
 
 $(document).ready(function(){
-$("#menu").click(function() {
+$("#menu_control").click(function() {
     widthpage=$(window).width()
     if (click_check==0){
         $("#menu_content").animate({'width' : (widthpage*0.251)}, 500);
@@ -102,19 +102,27 @@ $("#menu").click(function() {
 });
 });
 
-defaultmainmenu='light'
-$('[id="menu_click"]').click(function(){
-    if ($(this).attr('name')!=defaultmainmenu){
-        $('.main-menu').fadeTo(100, 0, function() {
-            $(this).hide();
+// Clicking a menu item
+var currently_selected_page='light';  // 'light' is our default page
+$('.menu_click').click(function(e){
+    var $clicked_menu_item = $(this);
+    var clicked_menu_item_section_name = $(this).attr("name");
+    if ($clicked_menu_item.attr('name') != currently_selected_page){
+        var $selected_page_container = $("#"+clicked_menu_item_section_name);
+        var $other_page_containers = $(".main-menu").not("#"+clicked_menu_item_section_name);
+        $other_page_containers.fadeTo(100,0);  // Fade out from view
+        $selected_page_container.show(function(){
+            $(this).fadeTo(100,1);
         });
-        $("#"+$(this).attr('name')).show(function(){
-            $($(this)).fadeTo(100,1)
-        })
-        defaultmainmenu=$(this).attr('name')
+        $other_page_containers.hide(0);  // Properly hide from DOM so they don't intercept touch events
+
+        currently_selected_page = clicked_menu_item_section_name;
+
+        // Hide off the main menu now an item has been selected
         $("#menu_content").animate({'width' : 0}, 500);
         $("#menu").animate({'right' : 0}, 500);
-        click_check=0
+        click_check=0;
+
     }
 });
 
@@ -127,7 +135,7 @@ function TimeClock() {
   document.getElementById("clock").innerHTML = d.toLocaleTimeString();
 }
 
-
+// Determines the user's current location, then states sunrise and sunset for it
 $(document).ready(function(){
     $.getJSON( "https://api.sunrise-sunset.org/json?lat=36.7201600&lng=-4.4203400&date=today", {
         tags: "sunrise sunset",

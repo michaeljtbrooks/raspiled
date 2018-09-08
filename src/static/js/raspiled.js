@@ -93,14 +93,12 @@ function update_current_colour(current, current_rgb, contrast, is_preset){
 };
 
 //Preset pickers:
-$(document).ready(function(){
-	$(".select_preset").on("click", function(e){
+$.fn.activate_presets = function(){
+    $(document).on("click", ".select_preset", function(e){
 		var $picker_button = $(this);
 		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
-		console.log(querystring)
-                var colorstring = $picker_button.data("color");
-		console.log(colorstring)
+        var colorstring = $picker_button.data("color");
 		var is_sequence = $picker_button.data("sequence");
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
@@ -117,8 +115,11 @@ $(document).ready(function(){
                 dataType: "json"
             }),
 	    150); //Debounce delay ms
-            
+
 	});
+}
+$(document).ready(function(){
+    $.fn.activate_presets();
 });
 
 

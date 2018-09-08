@@ -3,6 +3,8 @@
 /lib
 /local
 /share
+/.idea
+/.settings
 
 *.conf
 *.config
@@ -12,3 +14,5 @@
 *.pyc
 *.swp
 .whitelist
+.project
+.pydevproject
