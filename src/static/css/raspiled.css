@@ -38,21 +38,67 @@ a{
 }
 
 #off_button {
-	position: relative;
+    position: relative;
     margin: 20px;
     right: 0;
     left: 0;
-	top: 0;
+    top: 0;
 }
 
-.menu{position:fixed;z-index:5;background-color:#dfe9ed;top:0px;right:0;height:5vh;min-height: 50px; width:3vw;min-width: 45px;border-bottom-left-radius:10px;}
+#off_button img{
+    width: 1em;
+}
 
-.menu_control li{list-style: none;position: absolute;background: #000;cursor: pointer}
+.menu{
+    position: fixed;
+    z-index: 5;
+    background-color: #dfe9ed;
+    top: 0px;
+    right: 0;
+    height: 5vh;
+    min-height: 50px;
+    border-bottom-left-radius:10px;
+}
+
+.menu_control{
+    list-style: none;
+    width: 5vh;
+    min-width: 50px;
+    height: 5vh;
+    min-height: 50px;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    display: inline-block;
+}
+
+/* Hamburger menu icon */
+.menu_control li{
+    list-style: none;
+    position: absolute;
+    background: rgba(0,0,0,0.6);
+    cursor: pointer;
+    height: 0.25em;
+    min-height: 3px;
+    margin: 0 18%;
+    width: 55%
+}
+.menu_control li:nth-child(1){top: 20%;}
+.menu_control li:nth-child(2){top: 45%;}
+.menu_control li:nth-child(3){top: 70%;}
+
+#off_button_quick {
+    display: inline-block;
+    vertical-align: top;
+    margin: 1vh 2vh 1vh 1vh;
+}
 
 
-.menu_control li:nth-child(1){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 20%;}
-.menu_control li:nth-child(2){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 45%;}
-.menu_control li:nth-child(3){height: 3px;width: 55%; margin: auto;left: 0;right: 0; top: 70%;}
+.menu_list div.menu_click {
+    cursor: pointer;
+}
+
 
 .menu_content{position:fixed;z-index:5;background-color:#dfe9ed;top: 0; right:0;height:100vh;width:0;color:black;text-align: center;padding-bottom:3vh}
 
@@ -79,3 +125,8 @@ a{
 .clickme:active {background-color: #354BA2;box-shadow: 0 5px #666;transform: translateY(4px);}
 
 .inner{position: absolute;top: 25%; left: 50%;transform: translate(-50%,-25%);width: 200px;height: 200px;}
+
+
+.disabled {
+    color: rgba(0,0,0,0.3);
+}

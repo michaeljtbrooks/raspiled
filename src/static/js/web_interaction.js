@@ -87,7 +87,7 @@ document.addEventListener('mousemove', function(event) {
 
 
 $(document).ready(function(){
-$("#menu").click(function() {
+$("#menu_control").click(function() {
     widthpage=$(window).width()
     if (click_check==0){
         $("#menu_content").animate({'width' : (widthpage*0.251)}, 500);
@@ -102,19 +102,87 @@ $("#menu").click(function() {
 });
 });
 
-defaultmainmenu='light'
-$('[id="menu_click"]').click(function(){
-    if ($(this).attr('name')!=defaultmainmenu){
-        $('.main-menu').fadeTo(100, 0, function() {
-            $(this).hide();
+// Clicking a menu item
+var currently_selected_page='light';  // 'light' is our default page
+$('.menu_click').click(function(e){
+    var $clicked_menu_item = $(this);
+    var clicked_menu_item_section_name = $(this).attr("name");
+    if ($clicked_menu_item.attr('name') != currently_selected_page){
+        var $selected_page_container = $("#"+clicked_menu_item_section_name);
+        var $other_page_containers = $(".main-menu").not("#"+clicked_menu_item_section_name);
+        $other_page_containers.fadeTo(100,0);  // Fade out from view
+        $selected_page_container.show(function(){
+            $(this).fadeTo(100,1);
         });
-        $("#"+$(this).attr('name')).show(function(){
-            $($(this)).fadeTo(100,1)
-        })
-        defaultmainmenu=$(this).attr('name')
+        $other_page_containers.hide(0);  // Properly hide from DOM so they don't intercept touch events
+
+        currently_selected_page = clicked_menu_item_section_name;
+
+        // Hide off the main menu now an item has been selected
         $("#menu_content").animate({'width' : 0}, 500);
         $("#menu").animate({'right' : 0}, 500);
-        click_check=0
+        click_check=0;
+
     }
 });
 
+
+// Updates the time on the Alarm screen to the current time
+var timeInterval = setInterval(function() {
+  TimeClock();
+}, 1000);
+
+function TimeClock() {
+  var d = new Date();
+  document.getElementById("clock").innerHTML = d.toLocaleTimeString();
+}
+
+
+function TimeStringToTime(timestring){
+    // Converts a time string from sunrise-sunset into an interpretable string
+    var timeparts = timestring.split(":");
+    if(timestring.includes("PM")){
+        var hours = Number(timeparts[0]) + 12;
+    } else {
+        var hours = Number(timeparts[0]);
+    }
+    var minutes = Number(timeparts[1]);
+    return hours+":"+minutes;
+}
+
+
+// Determines the user's current location, then states sunrise and sunset for it
+$(document).ready(function(){
+    // Resolve lat/lon from the sun-alarm DOM object
+    var $sun_alarm = $(".sun-alarm").first();
+    var latitude = $sun_alarm.data("latitude");
+    var longitude = $sun_alarm.data("longitude");
+
+    $.getJSON( "https://api.sunrise-sunset.org/json?lat="+latitude+"&lng="+longitude+"&date=today", {
+        tags: "sunrise sunset",
+        tagmode: "any",
+        format: "json"
+     }).done(function( data ) {
+         var sunrise = TimeStringToTime(data.results.sunrise);
+         var sunset = TimeStringToTime(data.results.sunset);
+         $( ".sun-alarm" ).append('<input type="Sunrise Alarm" class="form-control sunrise-picker" value="'+sunrise+'" ><input type="Sunset Alarm" class="form-control sunset-picker" value="'+sunset+'">');
+
+         new Picker(document.querySelector('.sunrise-picker'), {
+             format: 'HH:mm',
+             text: {
+                title: 'Sunrise',
+                cancel: 'Cancel',
+                confirm: 'Confirm',
+             }
+         });
+
+         new Picker(document.querySelector('.sunset-picker'), {
+             format: 'HH:mm',
+             text: {
+                title: 'Sunset',
+                cancel: 'Cancel',
+                confirm: 'Confirm',
+             }
+         });
+     });
+})

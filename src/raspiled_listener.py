@@ -17,6 +17,7 @@ import os
 from subprocess import check_output, CalledProcessError
 import time
 from twisted.internet import reactor, endpoints,protocol
+from twisted.protocols import basic
 from twisted.web.resource import Resource
 from twisted.web.server import Site, Request
 from twisted.web.static import File
@@ -44,55 +45,100 @@ logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
 
 RASPILED_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
 
+
+
 DEFAULTS = {
         'config_path' : RASPILED_DIR,
         'pi_host'     : 'localhost',
-        'pi_port'     : 9090,
-        'pig_port'    : 8888,
         'mopidy_port' : 6868,
-        'red_pin'     : '',
-        'green_pin'   : '',
-        'blue_pin'    : ''
-            }
+        'pi_port'     : 9090,   # the port our web server listens on (192.168.0.33:<pi_port>)
+        'pig_port'    : 8888,   # the port pigpio daemon is listening on for pin control commands
+        'latitude'    : 52.2053,  # If you wish to sync your sunrise/sunset to the real sun, enter your latitude as a decimal
+        'longitude'    : 0.1218,  # If you wish to sync your sunrise/sunset to the real sun, enter your longitude as a decimal
+
+        # Initial default values for your output pins. You can override them in your raspiled.conf file
+        'red_pin'     : '27',
+        'green_pin'   : '17',
+        'blue_pin'    : '22'
+}
 
 config_path = os.path.expanduser(RASPILED_DIR+'/raspiled.conf')
 wlist_path = os.path.expanduser(RASPILED_DIR+'/.whitelist.json')
 parser = configparser.ConfigParser(defaults=DEFAULTS)
+params = {}
 
 if os.path.exists(config_path):
     logging.info('Using config file: {}'.format(config_path))
     parser.read(config_path)
+    params = Odict2int(parser.defaults())
+    config_file_needs_writing = False
 else:
+    config_file_needs_writing = True
+    # No config file exists, give the user a chance to specify their pin configuration
     logging.warn('No config file found. Creating default {} file.'.format(config_path))
     logging.warn('*** Please edit this file as needed. ***')
-    
-    while True:
-        try:
-            DEFAULTS['red_pin']=input('RED pin number:')
-            DEFAULTS['green_pin']=input('GREEN pin number:')
-            DEFAULTS['blue_pin']=input('BLUE pin number:')
 
-            if (DEFAULTS['red_pin']==DEFAULTS['blue_pin'] 
-	      or DEFAULTS['red_pin']==DEFAULTS['green_pin'] 
-	      or DEFAULTS['green_pin']==DEFAULTS['blue_pin']):
-	        logging.warn('*** The pin number should be different for all pins. ***')
-	    else:
-	        logging.info('Configuration Finished.')
-	        break
-        except:
-	    logging.warn('*** The input should be an integer ***')
+    # Allow user to customise their pin config
+    while True:
+        try:  # These will assume the default settings UNLESS you enter a different value
+            user_input_red_pin = int(input('RED pin number [{}]:'.format(DEFAULTS["red_pin"])) or DEFAULTS["red_pin"])
+            user_input_green_pin = int(input('GREEN pin number [{}]:'.format(DEFAULTS["green_pin"])) or DEFAULTS["green_pin"])
+            user_input_blue_pin = int(input('BLUE pin number [{}]:'.format(DEFAULTS["blue_pin"])) or DEFAULTS["blue_pin"])
+        except (ValueError, TypeError):
+            logging.warn('*** The input should be an integer ***')
+        else:
+            DEFAULTS['red_pin'] = user_input_red_pin
+            DEFAULTS['green_pin'] = user_input_green_pin
+            DEFAULTS['blue_pin'] = user_input_blue_pin
+            if DEFAULTS['red_pin'] == DEFAULTS['blue_pin'] or DEFAULTS['red_pin'] == DEFAULTS['green_pin'] or DEFAULTS['green_pin'] == DEFAULTS['blue_pin']:
+                logging.warn('*** The pin number should be different for all pins. ***')
+            else:
+                config_file_needs_writing = True
+                break
+
+# Check that our ports are sane:
+user_pi_port = params.get("pi_port", DEFAULTS["pi_port"])
+user_pig_port = params.get("pig_port", DEFAULTS["pig_port"])
+while True:
+    config_is_ok = True
+    try:
+        if int(user_pi_port) == int(user_pig_port):
+            config_is_ok = False
+            raise RuntimeError("*** You cannot have the web server running on port {} while the pigpio daemon is also running on that port! ***".format(DEFAULTS["pi_port"]))
+    except RuntimeError as e:
+        logging.warn(e)
+    except (ValueError, TypeError):
+        logging.warn("*** You have specified an invalid port number for the Raspiled web server ({}) or the Pigpio daemon ({}) ***".format(DEFAULTS["pi_port"], DEFAULTS["pig_port"]))
+    else:  # Config is fine... carry on
+        DEFAULTS["pi_port"] = user_pi_port
+        DEFAULTS["pig_port"] = user_pig_port
+        break
+
+    try:
+        user_pi_port = int(input('Raspiled web server port (e.g. 9090) [{}]:'.format(DEFAULTS["pi_port"])) or DEFAULTS["pi_port"])
+        user_pig_port = int(input('Pigpio daemon port (e.g. 8888) [{}]:'.format(DEFAULTS["pig_port"])) or DEFAULTS["pig_port"])
+    except (ValueError, TypeError):
+        logging.warn('*** The input should be an integer ***')
+    else:
+        config_file_needs_writing = True
+
+
+# Now write the config file if needed
+if config_file_needs_writing:
     parser = configparser.ConfigParser(defaults=DEFAULTS)
     with open(config_path, 'w') as f:
         parser.write(f)
+    params = Odict2int(parser.defaults())
 
-params = Odict2int(parser.defaults())
+
+RESOLVED_USER_SETTINGS = params  # Alias for clarity
 
 DEBUG = False
+
 
 def D(item):
     if DEBUG:
         logging.info(item)
-
 
 
 class Preset(object):
@@ -117,7 +163,6 @@ class Preset(object):
         self.is_sun = is_sun
         self.args = args
         self.kwargs = kwargs
-    
     def __repr__(self):
         """
         Says what this is
@@ -207,8 +252,13 @@ class Preset(object):
         if self.is_sun:
             sunarg={}
             #for ii in range(0,len(self.display_gradient)):
-                 #if self.display_gradient[0]>self.display_gradient[1]:
-            sunarg['temp']=list(self.display_gradient)#self.display_gradient[ii].split('K')[0]
+            if self.display_gradient[0]>self.display_gradient[1]:
+                sunarg['temp_start']=self.display_gradient[0]
+                sunarg['temp_end']=self.display_gradient[1]
+            else:
+                sunarg['temp_start']=self.display_gradient[1]
+                sunarg['temp_end']=self.display_gradient[0]
+                
             cs = urlencode(sunarg, doseq=True)
             return cs
         return ""
@@ -258,23 +308,25 @@ class RaspiledControlResource(Resource):
     """
     Our web page for controlling the LED strips
     """
-    isLeaf = False #Allows us to go into dirs
-    led_strip = None #Populated at init
+    isLeaf = False  # Allows us to go into dirs
+    led_strip = None  # Populated at init
+    _path = None  # If a user wants to hit a dynamic subpage, the path appears here
     
     PARAM_TO_AUTHENTICATE = (
         ("user","newclient"),
         ("ukey","authenticate"),
         )
     #State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
+    # State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
     PARAM_TO_ACTION_MAPPING = (
-        #Stat actions
+        # Stat actions
         ("off", "off"),
         ("stop", "stop"),
         ("set", "set"),
         ("fade", "fade"),
         ("color", "fade"),
         ("colour", "fade"),
-        #Sequences
+        # Sequences
         ("sunrise", "sunrise"),
         ("morning", "alarm"),
         ("dawn", "alarm"),
@@ -288,10 +340,14 @@ class RaspiledControlResource(Resource):
         ("huerot", "rotate"),
         ("colors", "rotate"),
         ("colours", "rotate"),
+        # Docs:
+        ("capabilities", "capabilities"),
+        ("capability", "capabilities"),
+        ("status", "status"),
     )
     
-    #State what presets to render:
-    OFF_PRESET = Preset(label="&#x23FB; Off", display_colour="black", off="")
+    # State what presets to render:
+    OFF_PRESET = Preset(label="""<img src="/static/figs/power-button-off.svg" class="icon_power_off"> Off""", display_colour="black", off="")
     PRESETS = {
         "Whites":( #I've had to change the displayed colours from the strip colours for a closer apparent match
                 Preset(label="Candle", display_colour="1500K", fade="1000K"),
@@ -323,12 +379,12 @@ class RaspiledControlResource(Resource):
                 Preset(label="Cyan", display_colour="#00FFFF", fade="#00FFFF"),
                 Preset(label="Blue", display_colour="#0088FF", fade="#0088FF"),
                 Preset(label="Indigo", display_colour="#0000FF", fade="#0000FF"),
-                Preset(label="Purple", display_colour="#8800FF", fade="#7A00FF"), #There's a difference!
+                Preset(label="Purple", display_colour="#8800FF", fade="#7A00FF"),  # There's a difference!
                 Preset(label="Magenta", display_colour="#FF00FF", fade="#FF00FF"),
                 Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             ),
         "Sequences":(
-                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="700K,500K,1100K,600K,800K,1000K,500K,1200K", milliseconds="1800", is_sequence=True),
+                Preset(label="&#x1f525; Campfire", display_gradient=("600K","400K","1000K","400K"), rotate="1100K,800K,1100K,1300K,1300K,900K,1500K,800K,900K,800K,1300K,600K,600K,600K,900K,600K,900K,1100K,1400K,1400K,900K,800K,600K,700K,700K,900K,1000K,1000K,800K,900K,1000K,700K,900K,1000K,600K,700K,1000K,800K,800K,1400K,900K,1100K,1000K,1500K,1000K,1000K,900K,700K", milliseconds="80", is_sequence=True),
                 Preset(label="&#x1f41f; Fish tank", display_gradient=("#00FF88","#0088FF","#007ACC","#00FFFF"), rotate="00FF88,0088FF,007ACC,00FFFF", milliseconds="2500", is_sequence=True),
                 Preset(label="&#x1f389; Party", display_gradient=("cyan","yellow","magenta"), rotate="cyan,yellow,magenta", milliseconds="1250", is_sequence=True),
                 Preset(label="&#x1f33b; Flamboyant", display_gradient=("yellow","magenta"), jump="yellow,magenta", milliseconds="150", is_sequence=True),
@@ -337,6 +393,7 @@ class RaspiledControlResource(Resource):
                 Preset(label="&#x1f308; Full circle", display_gradient=("#FF0000","#FF8800","#FFFF00","#88FF00","#00FF00","#00FF88","#00FFFF","#0088FF","#0000FF","#8800FF","#FF00FF","#FF0088"), milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
             )
     }
+
     ALARM_PRESETS = {
         "Morning":(
                 Preset(label="&uarr; 2hr", display_gradient=("0K","5000K"), morning=60*60*2, is_sequence=True, is_sun=True),
@@ -352,20 +409,23 @@ class RaspiledControlResource(Resource):
             )
     }
 
+    PRESETS_COPY = copy.deepcopy(PRESETS)  # Modifiable dictionary. Used in alarms and music.
+
     def __init__(self, *args, **kwargs):
         """
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
-        self.led_strip = LEDStrip(params)
+        self.led_strip = LEDStrip(RESOLVED_USER_SETTINGS)
         Resource.__init__(self, *args, **kwargs) #Super
-        #Add in the static folder
+        # Add in the static folder.
         static_folder = os.path.join(RASPILED_DIR,"static")
-        self.putChild("static", File(static_folder))
+        self.putChild("static", File(static_folder))  # Any requests to /static serve from the filesystem.
     
     def getChild(self, path, request, *args, **kwargs):
         """
         Entry point for dynamic pages 
         """
+        self._path = path
         return self
     
     def getChildWithDefault(self, path, request):
@@ -415,7 +475,19 @@ class RaspiledControlResource(Resource):
    
     def render_GET(self, request):
         """
-        Responds to GET requests
+        MAIN WEB PAGE ENTRY POINT
+            Responds to GET requests
+
+            If a valid action in the GET querystring is present, that action will get performed and
+            the web server will return a JSON response. The assumption is that a javascript function is calling
+            this web server to act as an API
+
+            If a human being arrives at the web server without providing a valid action in the GET querystring,
+            they'll just be given the main html page which shows all the buttons.
+
+        @param request: The http request, passed in from Twisted, which will be an instance of <SmartRequest>
+
+        @return: HTML or JSON depending on if there is no action or an action.
         """
         accepted_client = self.client_LOGIN(request)
         if accepted_client:
@@ -428,40 +500,54 @@ class RaspiledControlResource(Resource):
                     _colour_result = getattr(self, action_func_name)(request) #Execute that function
                     break
         
-            #Now deduce our colour:
+            # Look through the actions if the request key exists, perform that action
+            clean_path = unicode(self._path or u"").rstrip("/")
+            for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
+                if request.has_param(key_name) or clean_path == key_name:
+                    action_func_name = "action__%s" % action_name
+                    if action_name in ("capabilities", "status"):  # Something is asking for our capabilities or status
+                        output = getattr(self, action_func_name)(request)  # Execute that function
+                        request.setHeader("Content-Type", "application/json; charset=utf-8")
+                        return json.dumps(output)
+                    else:
+                        self.led_strip.stop_current_sequence() #Stop current sequence
+                        _colour_result = getattr(self, action_func_name)(request) #Execute that function
+                    break
+        
+            # Now deduce our colour:
             current_colour = "({})".format(self.led_strip)
             current_hex = self.led_strip.hex
             contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
         
-            #Return a JSON object if a result:
+            # Return a JSON object if an action has been performed (i.e. _colour_result is set):
             if _colour_result is not None:
                 json_data = {
-                   "current" : current_hex,
-                   "contrast" : contrast_colour,
-                   "current_rgb": current_colour
+                    "current" : current_hex,
+                    "contrast" : contrast_colour,
+                    "current_rgb": current_colour
                 }
                 try:
+                    request.setHeader("Content-Type", "application/json; charset=utf-8")
                     return json.dumps(json_data)
-                except:
-                    return b"Json fkucked up"
+                except (TypeError, ValueError):
+                    return b"Raspiled generated invalid JSON data!"
         
-            #Otherwise return normal page
+            # Otherwise, we've not had an action, so return normal page
             request.setHeader("Content-Type", "text/html; charset=utf-8")
-            htmlstr=''
-            with open(RASPILED_DIR+'/static/index.html') as file:
-                for line in file:
-                     htmlstr+=line
+            htmlstr = ''
+            with open(RASPILED_DIR+'/static/index.html') as index_html_template:
+                htmlstr = index_html_template.read()  # 2018-09-08 It's more efficient to pull the whole file in
             return htmlstr.format(
-                current_colour=current_colour,
-                current_hex=current_hex,
-                contrast_colour=contrast_colour,
-                off_preset_html=self.OFF_PRESET.render(),
-                light_html=self.light_presets(request),
-                alarm_html=self.alarm_presets(request),
-                music_html=self.music_presets(request),
-                controls_html=self.udevelop_presets(request),
-                addition_js=self.js_interactions(request)
-                ).encode('utf-8')
+                   current_colour=current_colour,
+                   current_hex=current_hex,
+                   contrast_colour=contrast_colour,
+                   off_preset_html=self.OFF_PRESET.render(),
+                   light_html=self.light_presets(request),
+                   alarm_html=self.alarm_presets(request),
+                   music_html=self.music_presets(request),
+                   controls_html=self.udevelop_presets(request),
+                   addition_js=self.js_interactions(request)
+                   ).encode('utf-8')
         else:
             # Authenticatiom
             _connection_result=None
@@ -488,7 +574,6 @@ class RaspiledControlResource(Resource):
         """
         self.user = request.get_param("user", force=unicode)
         self.pswd = request.get_param("pswd", force=unicode)
-        print(self.user,self.pswd)
         if (self.user==None or self.pswd == None ):
             pass
         elif (self.user=='' or self.pswd == '' ):
@@ -531,9 +616,14 @@ class RaspiledControlResource(Resource):
         with open(wlist_path, 'w') as write_file:
             json.dump(self.session_data, write_file)
     
+    #### Additional pages available via the menu ####
+
     def light_presets(self, request):
         """
         Renders the light presets as options
+
+        @param request: The http request object
+
         """
         out_html_list = []
         for group_name, presets in self.PRESETS.items():
@@ -564,10 +654,9 @@ class RaspiledControlResource(Resource):
        out_html_list = []
        for group_name, presets in self.ALARM_PRESETS.items():
            preset_list = []
-           #Inner for
            for preset in presets:
-               preset_html = preset.render_select()
-               preset_list.append(preset_html)
+                preset_html = preset.render_select()
+                preset_list.append(preset_html)
            group_html = """
                 <p> {group_name} time </p>
                 <div class="{group_name}"></div>
@@ -576,10 +665,10 @@ class RaspiledControlResource(Resource):
                         {preset_html}
                     </select>
                 </div>
-            """.format(
-                group_name = group_name,
-                preset_html = "\n".join(preset_list)
-           )
+                """.format(
+                    group_name = group_name,
+                    preset_html = "\n".join(preset_list),
+                )
            out_html_list.append(group_html)
        out_html = "\n".join(out_html_list)
        return out_html
@@ -614,6 +703,7 @@ class RaspiledControlResource(Resource):
                  jsstr+=line
         return jsstr.format(latcoord=str(lat),loncoord=str(lon)).encode('utf-8')
 
+    #### Actions: These are the actions our web server can initiate. Triggered by hitting the url with ?action_name=value ####
 
     def action__set(self, request):
         """
@@ -622,6 +712,14 @@ class RaspiledControlResource(Resource):
         set_colour = request.get_param("set", force=unicode)
         D("Set to: %s" % set_colour)
         return self.led_strip.set(set_colour)
+    action__set.capability = {
+        "param": "set",
+        "description": "Sets the RGB strip to a single colour.",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF.",
+        "widget": "colourpicker",
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__fade(self, request):
         """
@@ -630,6 +728,13 @@ class RaspiledControlResource(Resource):
         fade_colour = request.get_param("fade", force=unicode)
         logging.info("Fade to: %s" % fade_colour)
         return self.led_strip.fade(fade_colour)
+    action__fade.capability = {
+        "param": "fade",
+        "description": "Fades the RGB strip from its current colour to a specified colour.",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF",
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__sunrise(self, request):
         """
@@ -637,9 +742,37 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        temp_start = request.get_param(['temp_start','K'], default=None, force=unicode)
+        temp_end = request.get_param('temp_end', default=None, force=unicode)
         logging.info("Sunrise: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temps=temps)
+        return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
+    action__sunrise.capability = {
+        "param": "sunrise",
+        "description": "Gently fades-in the RGB strip from deep red to daylight.",
+        "value": "The number of seconds you would like the sunrise to take.",
+        "validity": "<float> > 0",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the sunrise should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "1000",
+            },
+            {
+                "param": "temp_start",
+                "value": "The colour temperature you wish to start from (e.g. 500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "6500K"
+            },
+            {
+                "param": "temp_end",
+                "value": "The colour temperature you wish to finish at (e.g. 4500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "500K"
+            }
+        ],
+        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+    }
     
     def action__sunset(self, request):
         """
@@ -647,9 +780,37 @@ class RaspiledControlResource(Resource):
         """
         seconds = request.get_param(["seconds","s","sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
+        temp_end = request.get_param('temp_end', default=None, force=unicode)
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds/1000.0)))
-        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temps=temps)
+        return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
+    action__sunset.capability = {
+        "param": "sunset",
+        "description": "Gently fades-out the RGB strip from daylight to deep-red.",
+        "value": "The number of seconds you would like the sunrise to take.",
+        "validity": "<float> > 0",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the sunset should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "1000",
+            },
+            {
+                "param": "temp_start",
+                "value": "The colour temperature you wish to start from (e.g. 500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "500K"
+            },
+            {
+                "param": "temp_end",
+                "value": "The colour temperature you wish to finish at (e.g. 4500K).",
+                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "default": "6500K"
+            }
+        ],
+        "returns": ""
+    }
     
     def action__alarm(self, request):
         """
@@ -660,10 +821,11 @@ class RaspiledControlResource(Resource):
         hour = request.get_param(["time","hr","hour"], default='12:00', force=unicode)
         freq = request.get_param(["freq"], default='daily', force=float)
         milliseconds = request.get_param(["milliseconds","ms"], default=0.0, force=float)
-        temps = request.get_param(['temp','K'],default=0.0,force=unicode)
+        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
+        temp_end = request.get_param('temp_end', default=None, force=unicode)
         logging.info("Morning Alarm : %s seconds at %s" % (m_seconds + (milliseconds/1000.0), hour[0]))
         logging.info("Dawn Alarm    : %s seconds at %s" % (d_seconds + (milliseconds/1000.0), hour[1]))
-        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
+        return self.led_strip.alarm(seconds=[d_seconds,m_seconds], milliseconds=milliseconds, hour=hour, freq=freq, temp_start=temp_start, temp_end=temp_end)
 
     def action__jump(self, request):
         """
@@ -676,7 +838,28 @@ class RaspiledControlResource(Resource):
         total_seconds = (seconds + (milliseconds/1000.0))
         logging.info("Jump: %s, %s seconds" % (jump_colours, total_seconds))
         return self.led_strip.jump(jump_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
-    
+    action__jump.capability = {
+        "param": "jump",
+        "description": "Hops from one colour to the next over an even period of time.",
+        "value": "A comma delimited list of colours you wish to jump between.",
+        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the each colour should be displayed for. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "200",
+            },
+            {
+                "param": "seconds",
+                "value": "The number of seconds each colour should be displayed for. Will be added to milliseconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "0",
+            },
+        ],
+        "returns": "<unicode> The first hex value of sequence."
+    }
+
     def action__rotate(self, request):
         """
         Rotates (fades) from one specified colour to the next
@@ -688,12 +871,39 @@ class RaspiledControlResource(Resource):
         total_seconds = (seconds + (milliseconds/1000.0))
         logging.info("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
         return self.led_strip.rotate(rotate_colours, seconds=seconds, milliseconds=milliseconds) #Has its own colour sanitisation routine
-    
+    action__rotate.capability = {
+        "param": "rotate",
+        "description": "Fades from one colour to the next over an even period of time.",
+        "value": "A comma delimited list of colours you wish to cross-fade between.",
+        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "optional_concurrent_parameters": [
+            {
+                "param": "milliseconds",
+                "value": "The number of milliseconds the each colour fade should take. Will be added to seconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "200",
+            },
+            {
+                "param": "seconds",
+                "value": "The number of seconds each colour fade should take. Will be added to milliseconds (if specified) to give a total time.",
+                "validity": "<int> > 0",
+                "default": "0",
+            },
+        ],
+        "returns": "<unicode> The first hex value of sequence."
+    }
+
     def action__stop(self, request):
         """
         Stops the current sequence
         """
         return self.led_strip.stop()
+    action__stop.capability = {
+        "param": "stop",
+        "description": "Halts the current sequence or fade.",
+        "value": "",
+        "returns": "<unicode> The hex value of colour the RGB strip got halted on."
+    }
     
     def action__off(self, request):
         """
@@ -701,6 +911,36 @@ class RaspiledControlResource(Resource):
         """
         logging.info("Off!")
         return self.led_strip.off()
+    action__off.capability = {
+        "param": "off",
+        "description": "Stops any fades or sequences. Quickly Fades the RGB strip to black (no light)",
+        "value": "",
+        "returns": "<unicode> The hex value of colour the RGB strip ends up at (#000000)."
+    }
+
+    def action__capabilities(self, request, *args, **kwargs):
+        """
+        Reports this listener's capabilities
+        """
+        output_capabilities = []
+        for function_name in dir(self):
+            if function_name.startswith("action__"):
+                try:
+                    capability_details = getattr(self,function_name).capability
+                    output_capabilities.append(capability_details)
+                except AttributeError:
+                    pass
+        return output_capabilities
+
+    def action__status(self, request, *args, **kwargs):
+        """
+        Reports the status of the RGB LED strip
+        """
+        return {
+            "current": self.led_strip.hex,
+            "contrast": self.led_strip.contrast_from_bg(self.led_strip.hex, dark_default="202020"),
+            "current_rgb": "({})".format(self.led_strip)
+        }
     
     def teardown(self):
         """
@@ -741,8 +981,13 @@ class SmartRequest(Request, object):
             
             #If you want a whole list of values
             jump = request.get_list("jump")
-            
+
+    See docs: https://twistedmatrix.com/documents/8.0.0/api/twisted.web.server.Request.html
+
     """
+    def __init__(self, *args, **kwargs):
+        super(SmartRequest, self).__init__(*args, **kwargs)
+
     def get_param_values(self, name, default=None):
         """
         Failsafe way of getting querystring get and post params from the Request object
@@ -852,6 +1097,30 @@ def get_matching_pids(name, exclude_self=True):
     return pids
 
 
+def checkClientAgainstWhitelist(ip, user,token):
+    IPS = {
+           'IP1' : '127.0.0.1',
+           }
+
+    config_path = os.path.expanduser(RASPILED_DIR+'/.whitelist')
+    parser = configparser.ConfigParser(defaults=IPS)
+    
+    if os.path.exists(config_path):
+        parser.read(config_path)
+    else:
+        with open(config_path, 'w') as f:
+            parser.write(f)
+
+    whitelist=parser.defaults()
+    for ii in whitelist.keys():
+        if ip == whitelist[ii]:
+            logging.info('Client registered')
+            connection = True
+            break
+        else:
+            connection = False
+    return connection
+
 def start_if_not_running():
     """
     Checks if the process is running, if not, starts it!
@@ -861,11 +1130,12 @@ def start_if_not_running():
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
         factory = RaspiledControlSite(timeout=8) #8s timeout
-        endpoint = endpoints.TCP4ServerEndpoint(reactor, params['pi_port'])
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, RESOLVED_USER_SETTINGS['pi_port'])
         endpoint.listen(factory)
         reactor.run()
     else:
         logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
+
 
 if __name__=="__main__":
     start_if_not_running()
