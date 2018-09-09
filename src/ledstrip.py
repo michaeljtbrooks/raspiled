@@ -809,22 +809,18 @@ class LEDStrip(object):
                 temp_step = -100
                 x_start = 0
                 x_step_amount = 1
-                #logging.info("Sunsetting...")
             else:
                 temp_step = 100
                 x_start = 60
                 x_step_amount = -1
             temp_0 = int(t0)
             temp_n = int(t1)
-                #logging.info("Sun rising...")
         
             #Add in a fudge factor to cater for CPU doing other things:
-        
             #Calculate our z scaling factor:
             target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
             z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
             x_step = x_start
-        
             #And run the loop
             t1 = time.time()
             check = True #We only check the current values on the first run
@@ -835,7 +831,6 @@ class LEDStrip(object):
                 self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
                 x_step += x_step_amount
                 check=False
-        
             t2 = time.time()
             logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
@@ -905,7 +900,6 @@ class LEDStrip(object):
             schedule.every().day.at(hour).do(self.daily_alarm,hour,t_0,t_1,fudge_factor,freq,seconds,milliseconds) #schedule alarm depending on the frequency selected by the client.
         else:
             pass
-
         while True:
             schedule.run_pending()
             time.sleep(1) # wait one minute

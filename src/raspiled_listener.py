@@ -432,7 +432,6 @@ class RaspiledControlResource(Resource):
             current_colour = "({})".format(self.led_strip)
             current_hex = self.led_strip.hex
             contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
-        
             #Return a JSON object if a result:
             if _colour_result is not None:
                 json_data = {
@@ -488,7 +487,6 @@ class RaspiledControlResource(Resource):
         """
         self.user = request.get_param("user", force=unicode)
         self.pswd = request.get_param("pswd", force=unicode)
-        print(self.user,self.pswd)
         if (self.user==None or self.pswd == None ):
             pass
         elif (self.user=='' or self.pswd == '' ):
@@ -591,7 +589,7 @@ class RaspiledControlResource(Resource):
        out_html="""
            <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
            </iframe>
-       """.format(mopify=['mopidy_port'])
+       """.format(mopify=params['mopidy_port'])
        return out_html
 
     def udevelop_presets(self,request):

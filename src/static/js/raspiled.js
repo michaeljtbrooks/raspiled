@@ -98,9 +98,9 @@ $(document).ready(function(){
 		var $picker_button = $(this);
 		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
-		console.log(querystring)
+		//console.log(querystring)
                 var colorstring = $picker_button.data("color");
-		console.log(colorstring)
+		//console.log(colorstring)
 		var is_sequence = $picker_button.data("sequence");
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
@@ -108,7 +108,7 @@ $(document).ready(function(){
             $.ajax({
                 url: "/?"+ querystring + '&' + colorstring,
                 success: function(data){
-                    console.log(data);
+                    //console.log(data);
                     update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
                 },
                 error: function(data){
@@ -144,7 +144,6 @@ $(document).ready(function(){
                     dataType: "json"
                 }),
             150); //Debounce delay ms
-
         });
 });
 
