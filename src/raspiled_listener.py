@@ -589,7 +589,7 @@ class RaspiledControlResource(Resource):
        out_html="""
            <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
            </iframe>
-       """.format(mopify=['mopidy_port'])
+       """.format(mopify=params['mopidy_port'])
        return out_html
 
     def udevelop_presets(self,request):
