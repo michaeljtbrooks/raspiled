@@ -1,0 +1,22 @@
+/bin
+/include
+/lib
+/local
+/share
+/.idea
+/.settings
+
+*.conf
+*.config
+*.out
+*.json
+*.txt
+*.pyc
+*.swp
+<<<<<<< HEAD
+.whitelist*
+=======
+.whitelist
+.project
+.pydevproject
+>>>>>>> c484a8564c79f338a4250e1a2eb8731af6843a43

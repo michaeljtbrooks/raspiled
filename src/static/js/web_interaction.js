@@ -87,7 +87,7 @@ document.addEventListener('mousemove', function(event) {
 
 
 $(document).ready(function(){
-$("#menu_control").click(function() {
+$("#menu").click(function() {
     widthpage=$(window).width()
     if (click_check==0){
         $("#menu_content").animate({'width' : (widthpage*0.251)}, 500);
@@ -150,39 +150,3 @@ function TimeStringToTime(timestring){
     return hours+":"+minutes;
 }
 
-
-// Determines the user's current location, then states sunrise and sunset for it
-$(document).ready(function(){
-    // Resolve lat/lon from the sun-alarm DOM object
-    var $sun_alarm = $(".sun-alarm").first();
-    var latitude = $sun_alarm.data("latitude");
-    var longitude = $sun_alarm.data("longitude");
-
-    $.getJSON( "https://api.sunrise-sunset.org/json?lat="+latitude+"&lng="+longitude+"&date=today", {
-        tags: "sunrise sunset",
-        tagmode: "any",
-        format: "json"
-     }).done(function( data ) {
-         var sunrise = TimeStringToTime(data.results.sunrise);
-         var sunset = TimeStringToTime(data.results.sunset);
-         $( ".sun-alarm" ).append('<input type="Sunrise Alarm" class="form-control sunrise-picker" value="'+sunrise+'" ><input type="Sunset Alarm" class="form-control sunset-picker" value="'+sunset+'">');
-
-         new Picker(document.querySelector('.sunrise-picker'), {
-             format: 'HH:mm',
-             text: {
-                title: 'Sunrise',
-                cancel: 'Cancel',
-                confirm: 'Confirm',
-             }
-         });
-
-         new Picker(document.querySelector('.sunset-picker'), {
-             format: 'HH:mm',
-             text: {
-                title: 'Sunset',
-                cancel: 'Cancel',
-                confirm: 'Confirm',
-             }
-         });
-     });
-})

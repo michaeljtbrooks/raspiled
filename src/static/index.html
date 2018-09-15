@@ -4,7 +4,6 @@
         <link rel="stylesheet" href="/static/css/raspiled.css">
         <script src="/static/js/iro.min.js"></script>
         <script src="/static/js/jquery3.min.js"></script>
-        <script src="/static/js/raspiled.js"></script>
         <script src="/static/js/picker.js"></script>
         <link rel="stylesheet" href="/static/css/picker.css">
         <script>
@@ -18,7 +17,6 @@
 
     <body>
         <div class="menu" id="menu">
-            <div id="off_button_quick" >{off_preset_html}</div>
             <ul class="menu_control" id="menu_control">
                 <li></li>
                 <li></li>
@@ -57,7 +55,9 @@
             {light_html}
         </div>
         <div class="main-menu alarms" id="alarms">
+            <p id="clock"></p>
             {alarm_html}
+            <button class='alarm_preset'>Set up!</button>
         </div>
         <div class="main-menu music" id="music">
             {music_html}
@@ -66,5 +66,7 @@
             {controls_html}
         </div>
     </body>
+    <script>{addition_js}</script>
     <script src="/static/js/web_interaction.js"></script>
+    <script src="/static/js/raspiled.js"></script>
 </html>
