@@ -21,6 +21,7 @@ function debounce(func, wait, immediate) {
         if (callNow) func.apply(context, args);
     };
 };
+
 function init_colourpicker(current_hex){
 	//Initialises the colourpicker to the specified colour, or black
 	current_hex = current_hex || "#000000";
@@ -68,6 +69,7 @@ function init_colourpicker(current_hex){
 	
 	return raspiledColorPicker;
 };
+
 $.fn.extend({
     "debounce":debounce,
     "init_colourpicker": init_colourpicker
@@ -117,9 +119,13 @@ $(document).ready(function(){
                 dataType: "json"
             }),
 	    150); //Debounce delay ms
-            
+
 	});
 });
+
+//$(document).ready(function(){
+//    $.fn.activate_presets();
+//});
 
 //Preset pickers:
 $(document).ready(function(){

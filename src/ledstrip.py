@@ -779,7 +779,7 @@ class LEDStrip(object):
     rot = rotate #Alias
     huerot = rotate #Alias
     
-    def _sunrise_sunset(self, seconds=None, milliseconds=None, hour=None, freq=None, temps=None, setting=True):
+    def _sunrise_sunset(self, seconds=None, milliseconds=None, hour=None, freq=None, temp_start=None, temp_end=None, setting=True):
         """
         Silly routine to emulate a sunset
         
@@ -792,19 +792,19 @@ class LEDStrip(object):
         We have 60 steps, so we can apply limits on x (0 to 60). We end up with:
         
             z = (target_time - 6000) / log(65)-log(5) = (target_time - 6000) / 2.564949357
+
+        @keyword seconds: <float> Number of seconds to do the sequence over
+        @keyword milliseconds: <float> Number of milliseconds to do the sequence over, gets added to seconds if both provided
+        @keyword temp_start: <unicode> A colour temperature (in Kelvin) to start the sequence from
+        @keyword temp_end: <unicode> A colour temperature (in Kelvin) to end the sequence at
+        @keyword fade: <Boolean> whether to fade between steps (True) or jump (False)
         """
-        FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
+        FUDGE_FACTOR = 0.86
         if hour==None:
-            #logging.info("Running sunrise/sunset.... ")
-            if temps==None and setting==True:
-                t0= 6500
-                t1 = 500
-            elif temps==None and setting==False:
-                t0= 500
-                t1 = 6500
-	    else:
-                t0=temps[0].split('K')[0]
-		t1=temps[1].split('K')[0]
+            # Work out what the defaults should be
+            ## MOVE IT INSIDE THE Override values.
+            t0 = temp_start.split('K')[0]
+            t1 = temp_end.split('K')[0]
             if t0 > t1:
                 temp_step = -100
                 x_start = 0
@@ -815,7 +815,22 @@ class LEDStrip(object):
                 x_step_amount = -1
             temp_0 = int(t0)
             temp_n = int(t1)
-        
+            # You can override these defaults if either temp_start or temp_end is set
+            if temp_start:
+                try:
+                    _exists = NAMED_COLOURS[temp_start.lower()]
+                except (TypeError,ValueError):  # Means the starting temp has NOT been provided, use default
+                    pass
+                except KeyError:
+                    logging.warning("Sunrise/sunset: Your starting colour temperature '{}' is not a valid colour temperature".format(temp_start))
+            if temp_end:
+                try:
+                    _exists = NAMED_COLOURS[temp_end.lower()]
+                except (TypeError, ValueError):  # Means the ending temp has NOT been provided, use default
+                    pass
+                except KeyError:
+                    logging.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
+
             #Add in a fudge factor to cater for CPU doing other things:
             #Calculate our z scaling factor:
             target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
@@ -834,50 +849,42 @@ class LEDStrip(object):
             t2 = time.time()
             logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
+            temp_0=temp_start[0].split('K')[0]
+	    temp_n=temp_end[0].split('K')[0]
             if self.p_alarm != []:
                 self.teardown_alarm()
             process_alarm=[]
             for tt in range(0,len(hour)):
-                t0=float(temps[tt+tt*1].split('K')[0])
-                t1=float(temps[tt+tt*1+1].split('K')[0])
                 milliseconds=0
                 proc_hour=hour[tt]
-		alarm_arg=(proc_hour,t0,t1,FUDGE_FACTOR,freq,seconds[tt],milliseconds)
+		alarm_arg=(proc_hour,temp_0,temp_n,FUDGE_FACTOR,freq,seconds[tt],milliseconds)
                 
                 process_alarm.append(Process(target=self.schedule_alarm,args=alarm_arg))
             [pp.start() for pp in process_alarm] # Start processes in the background which contain the schedule of the alarm
             self.p_alarm=process_alarm
 
-    def sunset(self, seconds=None, milliseconds=None, temps=None):
-        """
-        Emulates a sunset, run in a separate thread
-        """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=True)
 
-    def sunrise(self, seconds=None, milliseconds=None, temps=None):
+    def alarm(self, seconds=None, milliseconds=None, hour=None, freq=None, temp_start=None, temp_end=None):
         """
         Emulates a sunset
         """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temps=temps, setting=False)
-
-    def alarm(self, seconds=None, milliseconds=None, hour=None, freq=None, temps=None):
-        """
-        Emulates a sunset
-        """
-        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, freq=freq, temps=temps)
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, hour=hour, freq=freq, temp_start=temp_start, temp_end=temp_end)
 
     def daily_alarm(self,hour=None,t_0=None,t_1=None,fudge_factor=None,freq=None,seconds=None,milliseconds=None):
         if t_0 > t_1:
             temp_step = -100
             x_start = 0
             x_step_amount = 1
-            #logging.info("Sunsetting...")
         else:
             temp_step = 100
             x_start = 60
             x_step_amount = -1
         temp_0 = int(t_0)
         temp_n = int(t_1)
+        #Add in a fudge factor to cater for CPU doing other things:
+        FUDGE_FACTOR = 0.86 #i.e we expect the routine to take 12% longer than the target time
+        
+        #Calculate our z scaling factor:
         target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
         z_factor = (target_time*fudge_factor) / 2.564949357
         x_step = x_start
@@ -903,4 +910,15 @@ class LEDStrip(object):
         while True:
             schedule.run_pending()
             time.sleep(1) # wait one minute
+        
+    def sunset(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None):
+        """
+        Emulates a sunset, run in a separate thread
+        """
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end, setting=True)
 
+    def sunrise(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None):
+        """
+        Emulates a sunset
+        """
+        return self.run_sequence(self._sunrise_sunset, seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end, setting=False)

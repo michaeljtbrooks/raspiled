@@ -1,17 +1,18 @@
 <html>
     <head>
         <title>Raspiled</title>
-        <link rel="stylesheet" id="style" href="/static/css/raspiled.css">
+        <link rel="stylesheet" href="/static/css/raspiled.css">
         <script src="/static/js/iro.min.js"></script>
         <script src="/static/js/jquery3.min.js"></script>
         <script src="/static/js/picker.js"></script>
-        <link rel="stylesheet" id="style" href="/static/css/picker.css">
+        <link rel="stylesheet" href="/static/css/picker.css">
         <script>
             //Load our colour-picker
             $(document).ready(function(e){{
                 $.fn.init_colourpicker("{current_hex}");
             }});
         </script>
+        <link rel="icon" href="/static/figs/favicon.png" sizes="512x512" type="image/png">
     </head>
 
     <body>
@@ -27,10 +28,10 @@
                 <img src="./static/figs/raspiled.svg">
             </div>
             <div class="menu_list" id="menu_list">
-                <div name="light" id="menu_click">Light</div>
-                <div name="alarms" id="menu_click">Alarms</div>
-                <div name="music" id="menu_click">Music</div>
-                <div name="control" id="menu_click">Controls</div>
+                <div name="light" id="menu_list__light" class="menu_click">Light</div>
+                <div name="alarms" id="menu_list__alarms" class="menu_click">Alarms</div>
+                <div name="music" id="menu_list__music" class="menu_click disabled">Music</div>
+                <div name="control" id="menu_list__control" class="menu_click disabled">Controls</div>
             </div>
             <div id="off_button">{off_preset_html}</div>
             <div class="info">
@@ -43,6 +44,9 @@
                     </a>
                 </div>
             </div>
+        </div>
+        <div class="logo">
+            <img src="./static/figs/raspiled_trans.svg">
         </div>
         <div class="main-menu light" id="light">
         <h1>Light Control:</h1>
@@ -62,7 +66,7 @@
             {controls_html}
         </div>
     </body>
-    <script src="/static/js/web_interaction.js"></script>
     <script>{addition_js}</script>
+    <script src="/static/js/web_interaction.js"></script>
     <script src="/static/js/raspiled.js"></script>
 </html>

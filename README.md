@@ -104,7 +104,10 @@ If you want the Raspberry Pi to boot up and automatically run Raspiled, you can 
 ```bash
 /path/to/your/virtualenv/python /path/to/your/raspiled/src/raspiled_listener.py
 ```
-
+Use absolute paths. e.g. assuming you put Raspiled into the /opt directory:
+```bash
+   /opt/raspiled/bin/activate/python  /opt/raspiled/src/raspiled_listener.py
+```
 
 ### Web Interface ###
 #### http://<your.raspberry.pi.ip>:9090 ####
