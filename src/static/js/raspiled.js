@@ -21,6 +21,7 @@ function debounce(func, wait, immediate) {
         if (callNow) func.apply(context, args);
     };
 };
+
 function init_colourpicker(current_hex){
 	//Initialises the colourpicker to the specified colour, or black
 	current_hex = current_hex || "#000000";
@@ -68,6 +69,7 @@ function init_colourpicker(current_hex){
 	
 	return raspiledColorPicker;
 };
+
 $.fn.extend({
     "debounce":debounce,
     "init_colourpicker": init_colourpicker
@@ -93,20 +95,22 @@ function update_current_colour(current, current_rgb, contrast, is_preset){
 };
 
 //Preset pickers:
-$.fn.activate_presets = function(){
-    $(document).on("click", ".select_preset", function(e){
-            var $picker_button = $(this);
-            var $current_colour_board = $("#current-colour");
-            var querystring = $picker_button.data("qs");
-            var colorstring = $picker_button.data("color");
-            var is_sequence = $picker_button.data("sequence");
-            $(".select_preset").removeClass("button_selected");
-            $picker_button.addClass("button_selected");
-            $.fn.debounce( //Debounced to prevent excessive AJAX calls
+$(document).ready(function(){
+	$(".select_preset").on("click", function(e){
+		var $picker_button = $(this);
+		var $current_colour_board = $("#current-colour");
+		var querystring = $picker_button.data("qs");
+		//console.log(querystring)
+                var colorstring = $picker_button.data("color");
+		//console.log(colorstring)
+		var is_sequence = $picker_button.data("sequence");
+		$(".select_preset").removeClass("button_selected");
+        $picker_button.addClass("button_selected");
+		$.fn.debounce( //Debounced to prevent excessive AJAX calls
             $.ajax({
                 url: "/?"+ querystring + '&' + colorstring,
                 success: function(data){
-                    console.log(data);
+                    //console.log(data);
                     update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
                 },
                 error: function(data){
@@ -117,10 +121,11 @@ $.fn.activate_presets = function(){
 	    150); //Debounce delay ms
 
 	});
-}
-$(document).ready(function(){
-    $.fn.activate_presets();
 });
+
+//$(document).ready(function(){
+//    $.fn.activate_presets();
+//});
 
 //Preset pickers:
 $(document).ready(function(){
@@ -145,7 +150,6 @@ $(document).ready(function(){
                     dataType: "json"
                 }),
             150); //Debounce delay ms
-
         });
 });
 

@@ -99,6 +99,7 @@ else:
 # Check that our ports are sane:
 user_pi_port = params.get("pi_port", DEFAULTS["pi_port"])
 user_pig_port = params.get("pig_port", DEFAULTS["pig_port"])
+
 while True:
     config_is_ok = True
     try:
@@ -518,7 +519,6 @@ class RaspiledControlResource(Resource):
             current_colour = "({})".format(self.led_strip)
             current_hex = self.led_strip.hex
             contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
-        
             # Return a JSON object if an action has been performed (i.e. _colour_result is set):
             if _colour_result is not None:
                 json_data = {
@@ -677,11 +677,12 @@ class RaspiledControlResource(Resource):
        """
        Renders the Modipy music front page.
        """
-       out_html="""
-           <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
-           </iframe>
-       """.format(mopify=['mopidy_port'])
-       return out_html
+       #out_html="""
+       #    <iframe src="http://192.168.182.190:{mopify}/mopify/" style="width:100vw;height:100vh">
+       #    </iframe>
+       #""".format(mopify=params['mopidy_port'])
+       #return out_html
+       pass
 
     def udevelop_presets(self,request):
        """
@@ -696,7 +697,11 @@ class RaspiledControlResource(Resource):
     
     def js_interactions(self,request):
         request.setHeader("Content-Type", "text/html; charset=utf-8")
-        lat,lon=pi_gps_location()
+        if params['latitude'] == '' or params['longitude'] == '':
+            lat,lon=pi_gps_location()
+        else:
+            lat=params['latitude']
+            lon=params['longitude']
         jsstr=''
         with open(RASPILED_DIR+'/static/js/raspiled_interaction.js') as file:
             for line in file:

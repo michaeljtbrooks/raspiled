@@ -2,6 +2,7 @@
 config_path = ./raspiled.conf
 pi_port = 9090
 pi_host = localhost
+pig_port = 8888
 mopidy_port = 6868
 pig_port = 8888
 blue_pin = 24

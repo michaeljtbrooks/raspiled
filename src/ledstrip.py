@@ -802,8 +802,9 @@ class LEDStrip(object):
         FUDGE_FACTOR = 0.86
         if hour==None:
             # Work out what the defaults should be
+            ## MOVE IT INSIDE THE Override values.
             t0 = temp_start.split('K')[0]
-            t1 = temp_end.splot('K')[0]
+            t1 = temp_end.split('K')[0]
             if t0 > t1:
                 temp_step = -100
                 x_start = 0
@@ -817,26 +818,24 @@ class LEDStrip(object):
             # You can override these defaults if either temp_start or temp_end is set
             if temp_start:
                 try:
-                    _exists = NAMED_COLOURS[temp_start]
-                    t0 = temp_start.rstrip('K')
+                    _exists = NAMED_COLOURS[temp_start.lower()]
                 except (TypeError,ValueError):  # Means the starting temp has NOT been provided, use default
                     pass
                 except KeyError:
                     logging.warning("Sunrise/sunset: Your starting colour temperature '{}' is not a valid colour temperature".format(temp_start))
             if temp_end:
                 try:
-                    _exists = NAMED_COLOURS[temp_end]
-                    t1 = temp_end.rstrip('K')
+                    _exists = NAMED_COLOURS[temp_end.lower()]
                 except (TypeError, ValueError):  # Means the ending temp has NOT been provided, use default
                     pass
                 except KeyError:
                     logging.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
 
+            #Add in a fudge factor to cater for CPU doing other things:
             #Calculate our z scaling factor:
             target_time = self.clean_time_in_milliseconds(seconds, milliseconds, default_seconds=1, minimum_milliseconds=1000)
             z_factor = (target_time*FUDGE_FACTOR) / 2.564949357
             x_step = x_start
-        
             #And run the loop
             t1 = time.time()
             check = True #We only check the current values on the first run
@@ -847,19 +846,18 @@ class LEDStrip(object):
                 self.fade(k, fade_time=((100+z_factor)/(65-x_step)), check=check) #ms, slows down as sunset progresses
                 x_step += x_step_amount
                 check=False
-        
             t2 = time.time()
             logging.info("%ss, target=%ss" % ((t2-t1),target_time/1000.0))
         else:
+            temp_0=temp_start[0].split('K')[0]
+	    temp_n=temp_end[0].split('K')[0]
             if self.p_alarm != []:
                 self.teardown_alarm()
             process_alarm=[]
             for tt in range(0,len(hour)):
-                t0=float(temp_start[0].split('K')[0])
-                t1=float(temp_end[0].split('K')[0])
                 milliseconds=0
                 proc_hour=hour[tt]
-		alarm_arg=(proc_hour,t0,t1,FUDGE_FACTOR,freq,seconds[tt],milliseconds)
+		alarm_arg=(proc_hour,temp_0,temp_n,FUDGE_FACTOR,freq,seconds[tt],milliseconds)
                 
                 process_alarm.append(Process(target=self.schedule_alarm,args=alarm_arg))
             [pp.start() for pp in process_alarm] # Start processes in the background which contain the schedule of the alarm
