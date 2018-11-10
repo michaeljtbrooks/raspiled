@@ -281,13 +281,11 @@ class PresetSpace(object):
         return "&nbsp;"
 
 
-class RaspiledControlResource(Resource):
+class RaspiledControlResource(RaspberryPiWebResource):
     """
     Our web page for controlling the LED strips
     """
-    isLeaf = False  # Allows us to go into dirs
     led_strip = None  # Populated at init
-    _path = None  # If a user wants to hit a dynamic subpage, the path appears here
     
     # State what params should automatically trigger actions. If none supplied will show a default page. Specified in order of hierarchy
     PARAM_TO_ACTION_MAPPING = (
@@ -372,105 +370,24 @@ class RaspiledControlResource(Resource):
         @TODO: perform LAN discovery, interrogate the resources, generate controls for all of them
         """
         self.led_strip = LEDStrip(RESOLVED_USER_SETTINGS)
-        Resource.__init__(self, *args, **kwargs) #Super
-        # Add in the static folder.
-        static_folder = os.path.join(RASPILED_DIR,"static")
-        self.putChild("static", File(static_folder))  # Any requests to /static serve from the filesystem.
-    
-    def getChild(self, path, request, *args, **kwargs):
+        RaspberryPiWebResource.__init__(self, *args, **kwargs)  # Super, deals with generating the static directory etc
+
+    def render_controls(self, request):
         """
-        Entry point for dynamic pages 
+        Show the main controls screen
         """
-        self._path = path
-        return self
-    
-    def getChildWithDefault(self, path, request):
-        """
-        Retrieve a static or dynamically generated child resource from me.
-
-        First checks if a resource was added manually by putChild, and then
-        call getChild to check for dynamic resources. Only override if you want
-        to affect behaviour of all child lookups, rather than just dynamic
-        ones.
-
-        This will check to see if I have a pre-registered child resource of the
-        given name, and call getChild if I do not.
-
-        @see: L{IResource.getChildWithDefault}
-        """
-        if path in self.children:
-            return self.children[path]
-        return self.getChild(path, request)
-    
-    def render_GET(self, request):
-        """
-        MAIN WEB PAGE ENTRY POINT
-            Responds to GET requests
-
-            If a valid action in the GET querystring is present, that action will get performed and
-            the web server will return a JSON response. The assumption is that a javascript function is calling
-            this web server to act as an API
-
-            If a human being arrives at the web server without providing a valid action in the GET querystring,
-            they'll just be given the main html page which shows all the buttons.
-
-        @param request: The http request, passed in from Twisted, which will be an instance of <SmartRequest>
-
-        @return: HTML or JSON depending on if there is no action or an action.
-        """
-        _colour_result = None
-        
-        # Look through the actions if the request key exists, perform that action
-        clean_path = unicode(self._path or u"").rstrip("/")
-        for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
-            if request.has_param(key_name) or clean_path == key_name:
-                action_func_name = "action__%s" % action_name
-                if action_name in ("capabilities", "status"):  # Something is asking for our capabilities or status
-                    output = getattr(self, action_func_name)(request)  # Execute that function
-                    request.setHeader("Content-Type", "application/json; charset=utf-8")
-                    return json.dumps(output)
-                else:
-                    self.led_strip.stop_current_sequence() #Stop current sequence
-                    _colour_result = getattr(self, action_func_name)(request) #Execute that function
-                break
-        
-        # Now deduce our colour:
-        current_colour = "({})".format(self.led_strip)
-        current_hex = self.led_strip.hex
-        contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
-        
-        # Return a JSON object if an action has been performed (i.e. _colour_result is set):
-        if _colour_result is not None:
-            json_data = {
-                "current" : current_hex,
-                "contrast" : contrast_colour,
-                "current_rgb": current_colour
-            }
-            try:
-                request.setHeader("Content-Type", "application/json; charset=utf-8")
-                return json.dumps(json_data)
-            except (TypeError, ValueError):
-                return b"Raspiled generated invalid JSON data!"
-        
-        # Otherwise, we've not had an action, so return normal page
-        request.setHeader("Content-Type", "text/html; charset=utf-8")
-        htmlstr = ''
-        with open(RASPILED_DIR+'/static/index.html') as index_html_template:
-            htmlstr = index_html_template.read()  # 2018-09-08 It's more efficient to pull the whole file in
-        return htmlstr.format(
-                current_colour=current_colour,
-                current_hex=current_hex,
-                contrast_colour=contrast_colour,
-                off_preset_html=self.OFF_PRESET.render(),
-                light_html=self.light_presets(request),
-                alarm_html=self.alarm_presets(request),
-                music_html=self.udevelop_presets(request),
-                controls_html=self.udevelop_presets(request)
-            ).encode('utf-8')
+        context = {
+            "off_preset_html": self.OFF_PRESET.render(),
+            "light_html": self.render_light_presets(request),
+            "alarm_html": self.render_alarm_presets(request),
+            "music_html": self.render_udevelop_presets(request),
+            "controls_html": self.render_udevelop_presets(request),
+        }
+        return RaspberryPiWebResource.render_controls(self, request, context)
 
     #### Additional pages available via the menu ####
 
-    def light_presets(self, request):
+    def render_light_presets(self, request):
         """
         Renders the light presets as options
 
@@ -499,16 +416,16 @@ class RaspiledControlResource(Resource):
         out_html = "\n".join(out_html_list)
         return out_html
 
-    def alarm_presets(self,request):
-       """
-       Renders the alarm presets as options. Same sunrise or sunset routine except for 100k.
-       """
-       out_html_list = []
-       preset_list = []
-       #Inner for
-       group_name="Sunrise / Sunset"
-       presets=self.PRESETS_COPY[group_name]
-       for preset in presets:
+    def render_alarm_presets(self,request):
+        """
+        Renders the alarm presets as options. Same sunrise or sunset routine except for 100k.
+        """
+        out_html_list = []
+        preset_list = []
+        #Inner for
+        group_name="Sunrise / Sunset"
+        presets=self.PRESETS_COPY[group_name]
+        for preset in presets:
             try:
                 if preset.display_gradient[0]=='5000K':
                     preset.display_gradient=('5000K','50K')
@@ -518,7 +435,7 @@ class RaspiledControlResource(Resource):
                 pass
             preset_html = preset.render()
             preset_list.append(preset_html)
-       group_html = """
+        group_html = """
                 <p id="clock" class="current-colour"></p>
                 <h2>{group_name}</h2>
                 <div class="sun-alarm" data-latitude="{users_latitude}" data-longitude="{users_longitude}"></div>
@@ -533,22 +450,28 @@ class RaspiledControlResource(Resource):
                 users_latitude = RESOLVED_USER_SETTINGS.get("latitude", DEFAULTS.get("latitude", 52.2053)),
                 users_longitude = RESOLVED_USER_SETTINGS.get("longitude", DEFAULTS.get("longitude", 0.1218))
             )
-       out_html_list.append(group_html)
-       out_html = "\n".join(out_html_list)
-       return out_html
+        out_html_list.append(group_html)
+        out_html = "\n".join(out_html_list)
+        return out_html
 
-    def udevelop_presets(self,request):
-       """
-       Renders the Under Development text.
-       """
-       out_html="""
+    def render_udevelop_presets(self,request):
+        """
+        Renders the Under Development text.
+        """
+        out_html="""
            <div class="underdevelop">
            <h1> Under Development, please refer to the Github repository.</h1>
            </div>
-       """
-       return out_html
+        """
+        return out_html
 
     #### Actions: These are the actions our web server can initiate. Triggered by hitting the url with ?action_name=value ####
+
+    def before_action(self, *args, **kwargs):
+        """
+        Called just before an action takes place. We stop whatever current sequence is running
+        """
+        self.led_strip.stop_current_sequence()  # Stop current sequence
 
     def action__set(self, request):
         """
@@ -748,28 +671,20 @@ class RaspiledControlResource(Resource):
         "returns": "<unicode> The hex value of colour the RGB strip ends up at (#000000)."
     }
 
-    def action__capabilities(self, request, *args, **kwargs):
-        """
-        Reports this listener's capabilities
-        """
-        output_capabilities = []
-        for function_name in dir(self):
-            if function_name.startswith("action__"):
-                try:
-                    capability_details = getattr(self,function_name).capability
-                    output_capabilities.append(capability_details)
-                except AttributeError:
-                    pass
-        return output_capabilities
-
-    def action__status(self, request, *args, **kwargs):
+    def information__status(self, request, *args, **kwargs):
         """
         Reports the status of the RGB LED strip
         """
+        current_rgb = "({})".format(self.led_strip)
+        current_hex = self.led_strip.hex
+        contrast_colour = self.led_strip.contrast_from_bg(current_hex, dark_default="202020")
         return {
-            "current": self.led_strip.hex,
-            "contrast": self.led_strip.contrast_from_bg(self.led_strip.hex, dark_default="202020"),
-            "current_rgb": "({})".format(self.led_strip)
+            "current_hex": current_hex,
+            "current": current_rgb,
+            "current_colour": current_rgb,
+            "current_rgb": current_rgb,
+            "contrast": contrast_colour,
+            "contrast_colour": contrast_colour
         }
     
     def teardown(self):

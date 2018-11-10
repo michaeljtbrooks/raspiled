@@ -105,9 +105,9 @@ $.fn.activate_presets = function(){
 		$.fn.debounce( //Debounced to prevent excessive AJAX calls
             $.ajax({
                 url: "/?"+ querystring + '&' + colorstring,
-                success: function(data){
+                success: function(data, textStatus, xhr){
                     console.log(data);
-                    update_current_colour(data["current"], data["current_rgb"], data["contrast"], true)
+                    update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true)
                 },
                 error: function(data){
                 	$picker_button.addClass("button_selected_error");
