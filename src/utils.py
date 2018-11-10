@@ -8,7 +8,11 @@ from collections import OrderedDict
 from copy import copy
 import json
 import os
+from socket import SOL_SOCKET, SO_BROADCAST
+from time import sleep
 
+from twisted.internet import task
+from twisted.internet.protocol import DatagramProtocol
 from twisted.web.resource import Resource
 from twisted.web.static import File
 
@@ -57,6 +61,16 @@ class RaspberryPiWebResource(Resource):
     TEMPLATE_INDEX = "index.html"
     TEMPLATES_DIRECTORY = "templates"
     STATIC_DIRECTORY = "static"  # Always at http://whatever.your.ip.is:port/static/
+    BROADCAST_INTERVAL_SECONDS = 15  # Number of seconds between each broadcast
+    BROADCAST_PORT = 1900  # Port to broadcast to other devices on (SSDP = 1900)
+    BROADCAST_ADDR = "239.255.255.250"  # IP to broadcast to other devices
+
+    broadcaster = None  # How we tell the world about our existence
+    broadcast_task = None  # Where we store our broadcasting task (looping task)
+    ip_address = None  # I can be told where I lurk!
+
+    _cached_capabilities = None  # Saves us regenerating the resource dict every time
+    _cached_json = None
 
     isLeaf = False  # Allows us to go into dirs
     _path = None  # If a user wants to hit a dynamic subpage, the path appears here
@@ -117,24 +131,26 @@ class RaspberryPiWebResource(Resource):
         """
         return None
 
-    def information__capabilities(self, request, *args, **kwargs):
+    def information__capabilities(self, *args, **kwargs):
         """
         Reports this listener's capabilities
         """
-        status_docs = self.__class__.information__status.capability
-        output_capabilities = [status_docs]
-        for function_name in dir(self):
-            if function_name.startswith("action__"):
-                param_name = function_name.replace("action__", "")
-                try:
-                    capability_details = getattr(self, function_name).capability
-                except AttributeError:
-                    capability_details = {
-                        "param": param_name,
-                        "description": None
-                    }
-                output_capabilities.append(capability_details)
-        return output_capabilities
+        if self._cached_capabilities is None:
+            status_docs = self.information__status__capability
+            output_capabilities = [status_docs]
+            for function_name in dir(self):
+                if function_name.startswith("action__"):
+                    param_name = function_name.replace("action__", "")
+                    try:
+                        capability_details = getattr(self, function_name).capability
+                    except AttributeError:
+                        capability_details = {
+                            "param": param_name,
+                            "description": None
+                        }
+                    output_capabilities.append(capability_details)
+            self._cached_capabilities = output_capabilities
+        return self._cached_capabilities
 
     def information__status(self, request, *args, **kwargs):
         """
@@ -145,18 +161,20 @@ class RaspberryPiWebResource(Resource):
         out_dict = {}
         out_dict.update(kwargs)
         return out_dict
-    information__status.capability = {
+    information__status__capability = {
         "param": "status",
         "description": "Reports this device's current status.",
         "value": "",
         "returns": "<JSON> A JSON object for its status"
     }
 
-    def render_json(self, request, context=None, http_code=200):
+    @classmethod
+    def render_json(cls, request, context=None, http_code=200):
         """
         Renders a context object into JSON
         :param request: <SmartRequest>
         :param context: A python object to JSONify
+        :param http_code: <int> The status code of the web response
         :return: rendered valid JSON in utf8
         """
         try:
@@ -190,7 +208,8 @@ class RaspberryPiWebResource(Resource):
                 real_context["output"] = original_context
         return self.render_json(request, context=real_context, http_code=http_code)
 
-    def render_html(self, request, template, context=None, http_code=200):
+    @classmethod
+    def render_html(cls, request, template, context=None, http_code=200):
         """
         Renders a given template with the data in context
         :param request: <SmartRequest>
@@ -266,4 +285,61 @@ class RaspberryPiWebResource(Resource):
 
         # Or it's to show the controls
         return self.render_controls(request)
+
+    def setup_broadcasting(self, reactor):
+        """
+        Hooks the reactor up to a transport to permit broadcasting
+        :param reactor:
+        :return:
+        """
+        self.broadcaster = BroadcastCapabilitiesProtocol()  # For broadcasting my presence
+        reactor.listenUDP(0, self.broadcaster)
+        self.broadcast_task = task.LoopingCall(self.broadcast_presence)
+        self.broadcast_task.start(self.BROADCAST_INTERVAL_SECONDS)
+
+    def whoami(self):
+        """
+        Returns a dict saying who I am (what service I am, where I am etc)
+        :return: {}
+        """
+        my_ip = None
+
+    def broadcast_presence(self):
+        """
+        Simply announces own presence onto the network
+        See scheduling tasks in twisted: https://twistedmatrix.com/documents/13.1.0/core/howto/time.html
+        :return: None
+        """
+        try:
+            cached_json = getattr(self, "_cached_json", None)
+            if cached_json is None:
+                whoami = "WHOAMI"
+                cached_json = json.dumps(whoami)
+                self._cached_json = cached_json
+            self.broadcaster.broadcast_message(message_json=cached_json, broadcast_address=self.BROADCAST_ADDR, broadcast_port=self.BROADCAST_PORT)
+        except Exception as e:
+            print(e)
+
+
+class BroadcastCapabilitiesProtocol(DatagramProtocol):
+    """
+    Allows a RaspberryPi resource to broadcast its presence on the network, including what it can do.
+    Other protocols will use this to discover other devices on the network.
+    """
+    def startProtocol(self):
+        """
+        Sets up the broadcast protocol
+        :return: None
+        """
+        self.transport.socket.setsockopt(SOL_SOCKET, SO_BROADCAST, True)
+
+    def broadcast_message(self, message_json, broadcast_address="235.255.255.250", broadcast_port=1900):
+        """
+        Takes the WebResourceClass, tells everyone else on the network that it's here and what it can do
+        :return: None
+        """
+        self.transport.write(message_json, (broadcast_address, broadcast_port))
+        print("Broadcast: {}".format(message_json))
+
+
 

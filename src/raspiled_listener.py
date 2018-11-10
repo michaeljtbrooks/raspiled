@@ -792,10 +792,20 @@ class RaspiledControlSite(Site, object):
     """
     Site thread which initialises the RaspiledControlResource properly
     """
+    ip_address = None
+
     def __init__(self, *args, **kwargs):
         resource = kwargs.pop("resource",RaspiledControlResource())
         super(RaspiledControlSite, self).__init__(resource=resource, requestFactory=SmartRequest, *args, **kwargs)
     
+    def buildProtocol(self, addr):
+        self.ip_address = addr
+        self.resource.ip_address = addr
+        return super(RaspiledControlSite, self).buildProtocol(addr)
+
+    def setup_broadcasting(self, reactor):
+        self.resource.setup_broadcasting(reactor)
+
     def stopFactory(self):
         """
         Called automatically when exiting the reactor. Here we tell the LEDstrip to tear down its resources
@@ -857,30 +867,6 @@ def checkClientAgainstWhitelist(ip, user,token):
     return connection
 
 
-class RaspiledProtocol(basic.LineReceiver):
-    """
-    Twisted Protocol to handle HTTP connections
-    """
-
-    def __init__(self):
-        self.lines = []
-
-    def lineReceived(self, line):
-        self.lines.append(line)
-        if not line:
-            self.sendResponse()
-
-    def sendResponse(self):
-        self.sendLine("HTTP/1.1 200 OK")
-        self.sendLine("")
-        responseBody = "You said:\r\n\r\n" + "\r\n".join(self.lines)
-        self.transport.write(responseBody)
-        self.transport.loseConnection()
-
-
-class HTTPEchoFactory(protocol.ServerFactory):
-    def buildProtocol(self, addr):
-        return RaspiledProtocol()
 
 def start_if_not_running():
     """
@@ -890,9 +876,11 @@ def start_if_not_running():
     pids = filter(bool,pids)
     if not pids: #No match! Implies we need to fire up the listener
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
+        # First the web
         factory = RaspiledControlSite(timeout=8) #8s timeout
         endpoint = endpoints.TCP4ServerEndpoint(reactor, RESOLVED_USER_SETTINGS['pi_port'])
         endpoint.listen(factory)
+        #factory.setup_broadcasting(reactor)  # Uncomment to broadcast stuff over network!
         reactor.run()
     else:
         logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
