@@ -273,7 +273,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
             Preset(label="Magenta", display_colour="#FF00FF", fade="#FF00FF"),
             Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             PresetRow(),
-            Preset(label="Tasty Teal", display_colour="#009882", fade="#00FFBB"),
+            Preset(label="Tasty Teal", display_colour="#009882", fade="#00FF3C"),
             Preset(label="Super Crimson", display_colour="#FF0077", fade="#FF0033"),
         ),
         "Sequences": (
@@ -284,7 +284,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
             Preset(label="&#x1f389; Party", display_gradient=("cyan", "yellow", "magenta"), rotate="cyan,yellow,magenta", milliseconds="1250",
                    is_sequence=True),
             Preset(label="&#x1f33b; Flamboyant", display_gradient=("yellow", "magenta"), jump="yellow,magenta", milliseconds="150", is_sequence=True),
-            Preset(label="&#x1F384; Christmas", display_gradient=("green", "red"), fade="green,red", milliseconds="300", is_sequence=True),
+            Preset(label="&#x1F384; Christmas", display_gradient=("green", "red"), rotate="green,red", milliseconds="300", is_sequence=True),
             Preset(label="&#x1f6a8; NeeNaw", display_gradient=("cyan", "blue"), jump="cyan,blue", milliseconds="100", is_sequence=True),
             Preset(label="&#x1f6a8; NeeNaw USA", display_gradient=("red", "blue"), jump="red,blue", milliseconds="100", is_sequence=True),
             Preset(label="&#x1f308; Full circle", display_gradient=(
