@@ -5,6 +5,8 @@
 /share
 /.idea
 /.settings
+/venv
+/env
 
 *.conf
 *.config

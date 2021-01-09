@@ -7,37 +7,32 @@ from __future__ import unicode_literals
 from collections import OrderedDict
 from copy import copy
 import json
+import logging
 import os
 from socket import SOL_SOCKET, SO_BROADCAST
-from time import sleep
+
 
 from twisted.internet import task
 from twisted.internet.protocol import DatagramProtocol
 from twisted.web.resource import Resource
 from twisted.web.static import File
 
+from src.config import DEBUG
+
 
 RASPBERRY_PI_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
 
 
-def ordereddict_to_int(ODict):
-    """
-    Converts an OrderedDict with unicode values to integers and/or floats (port and pins).
-    @param Odict: <OrderedDict> containg RASPILED configuration.
-
-    @returns: <OrderedDict> with integers instead of unicode values.
-    """
-    for key,value in ODict.items():
-        if u"." in unicode(value):
-            casting_function = float
-        else:
-            casting_function = int
-        try:
-            ODict[key] = casting_function(value)
-        except (TypeError, ValueError):
-            pass
-    return ODict
-Odict2int = ordereddict_to_int  # ALIAS
+def D(item="", *args, **kwargs):
+    if DEBUG:
+        if args or kwargs:
+            try:
+                item = item.format(*args, **kwargs)
+                print(item)
+            except IndexError:
+                item = "{} {} {}".format(item, args, kwargs)
+                print("D_FORMAT_ERROR: {}".format(item))
+        logging.debug(item)
 
 
 class NotImplementedError(Exception):

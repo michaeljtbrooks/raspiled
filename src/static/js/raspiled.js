@@ -53,12 +53,15 @@ function init_colourpicker(current_hex){
     var $current_colour_board = $(".current-colour");  
     raspiledColorPicker.on("color:change", function(color, changes) {
         if(!$.colour_picker.suppress_set){ //Sometimes we want to change the UI colour but not send a command to the Raspi
-	    	$.fn.debounce( //Debounced to prevent excessive AJAX calls
-	            $.ajax({
+	    	let $wheel_saturation = $(document).find("circle.iro__wheel__saturation").first();
+            $.fn.debounce( //Debounced to prevent excessive AJAX calls
+                $.ajax({
 	                url: "/",
 	                data: {"set": color.hexString},
 	                success: function(data){
-	                	update_current_colour(data["current"], data["current_rgb"], data["contrast"], false)
+	                    $wheel_saturation.prop("fill", "url(#iroGradient0)")
+                        $wheel_saturation.attr("fill", "url(#iroGradient0)")
+	                	update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], false)
 	                },
 	                dataType: "json"
 	            }),
@@ -74,20 +77,29 @@ $.fn.extend({
 });
 
 //Update the colour wheel
-function update_current_colour(current, current_rgb, contrast, is_preset){
+function update_current_colour(current, current_rgb, contrast, is_preset, sequence_name){
 	//Updates the UI to show the specified colour
 	is_preset = is_preset || false;
+	sequence_name = sequence_name || null;
 	
 	//Colour label first
 	var $current_colour_board = $("#current-colour");
     $current_colour_board.css("color",contrast);
     $current_colour_board.css("background-color", current);
-    $current_colour_board.html(current + " " + current_rgb);
-    
+    if(sequence_name){
+	    $current_colour_board.html(sequence_name);
+    } else {
+        $current_colour_board.html(current + " " + current_rgb);
+    }
+
     //Now the colour wheel (we suppress this so we don't fire off a "set" ajax call:
-	if(is_preset){ //Only need to move the wheel if its not a preset 
+	if(is_preset){ //Only need to move the wheel if its not a preset
 	    $.colour_picker.suppress_set = true;
-		$.colour_picker.color.hexString = current;
+        if(sequence_name){
+            $.colour_picker.color.hexString = "#FFFFFF";
+        } else {
+            $.colour_picker.color.hexString = current;
+        }
 		$.colour_picker.suppress_set = false;
 	}
 };
@@ -100,6 +112,7 @@ $.fn.activate_presets = function(){
 		var querystring = $picker_button.data("qs");
         var colorstring = $picker_button.data("color");
 		var is_sequence = $picker_button.data("sequence");
+		let $wheel_saturation = $(document).find("circle.iro__wheel__saturation").first();
 		$(".select_preset").removeClass("button_selected");
         $picker_button.addClass("button_selected");
 		$.fn.debounce( //Debounced to prevent excessive AJAX calls
@@ -107,7 +120,15 @@ $.fn.activate_presets = function(){
                 url: "/?"+ querystring + '&' + colorstring,
                 success: function(data, textStatus, xhr){
                     console.log(data);
-                    update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true)
+                    if(is_sequence){
+                        // Is a sequence. So set the wheel to show the gradient of the preset:
+                        update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true, $picker_button.text())
+                    } else {
+                        // Not a sequence, so fill with the usual gradient and select the colour
+                        $wheel_saturation.prop("fill", "url(#iroGradient0)")
+                        $wheel_saturation.attr("fill", "url(#iroGradient0)")
+                        update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true, false)
+                    }
                 },
                 error: function(data){
                 	$picker_button.addClass("button_selected_error");
