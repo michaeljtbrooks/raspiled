@@ -9,6 +9,7 @@
 
 var click_check = 0;
 var menu = document.getElementById('menu');
+var menu_control = document.getElementById('menu_control');
 var menucontent = document.getElementById('menu_content');
 
 menu.style.cursor = 'pointer';
@@ -47,7 +48,7 @@ $.fn.animateRotate = function(angle, duration, initialangle, background, easing,
 
 document.body.appendChild(menu);
 
-menu.addEventListener('mousedown', function(e) {
+menu_control.addEventListener('mousedown', function(e) {
     isDown = true;
     offset = [
         menu.offsetLeft-e.clientX,
@@ -87,19 +88,19 @@ document.addEventListener('mousemove', function(event) {
 
 
 $(document).ready(function(){
-$("#menu_control").click(function() {
-    widthpage=$(window).width()
-    if (click_check==0){
-        $("#menu_content").animate({'width' : (widthpage*0.251)}, 500);
-        $("#menu").animate({'right' : (widthpage*0.25)}, 500)
-        click_check=1
-    }
-    else{
-        $("#menu_content").animate({'width' : 0}, 500);
-        $("#menu").animate({'right' : 0}, 500);
-        click_check=0
-    }
-});
+    $("#menu_control").click(function() {
+        widthpage=$(window).width()
+        if (click_check==0){
+            $("#menu_content").animate({'width' : (widthpage*0.251)}, 500);
+            $("#menu").animate({'right' : (widthpage*0.25)}, 500)
+            click_check=1
+        }
+        else{
+            $("#menu_content").animate({'width' : 0}, 500);
+            $("#menu").animate({'right' : 0}, 500);
+            click_check=0
+        }
+    });
 });
 
 // Clicking a menu item
