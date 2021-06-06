@@ -36,7 +36,17 @@ def D(item="", *args, **kwargs):
 
 
 class NotImplementedError(Exception):
-    """This method is not implemented."""
+    """
+    This method is not implemented.
+    """
+    pass
+
+
+class ConfigurationError(RuntimeError):
+    """
+    When someone has codged up the config
+    """
+    pass
 
 
 class RaspberryPiWebResource(Resource):

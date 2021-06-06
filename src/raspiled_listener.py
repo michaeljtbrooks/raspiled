@@ -819,7 +819,11 @@ def start_if_not_running():
         logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
         # First the web
         factory = RaspiledControlSite(timeout=8)  # 8s timeout
-        endpoint = endpoints.TCP4ServerEndpoint(reactor, RESOLVED_USER_SETTINGS['pi_port'])
+        try:
+            pi_port = int(RESOLVED_USER_SETTINGS.get('pi_port', 9090))
+        except (TypeError, ValueError):
+            raise ConfigurationError("You have an invalid value for 'pi_port' in your settings. This needs to be a valid port number (integer).")
+        endpoint = endpoints.TCP4ServerEndpoint(reactor, pi_port)
         endpoint.listen(factory)
         # factory.setup_broadcasting(reactor)  # Uncomment to broadcast stuff over network!
         reactor.run()
