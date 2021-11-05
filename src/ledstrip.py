@@ -15,34 +15,20 @@ from __future__ import unicode_literals
 from named_colours import NAMED_COLOURS
 
 import copy
+import logging
 import pigpio
 import re
+import six
+import subprocess
 import time
 from time import sleep
 import threading
-import subprocess
-import logging
+from six.moves import html_parser as HTMLParser
 
-logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
-                    datefmt='%H:%M:%S', level=logging.INFO)
 
-# Python version safe importing of HTML parser
-try:
-    # Python 2.6-2.7 
-    from HTMLParser import HTMLParser
+logging.basicConfig(format=b'[%(asctime)s RASPILED] %(message)s',
+                    datefmt=b'%H:%M:%S', level=logging.INFO)
 
-    html_parser = HTMLParser()
-except ImportError:
-    # Python 3-3.3
-    try:
-        from html.parser import HTMLParser
-
-        html_parser = HTMLParser()
-    except ImportError:
-        # Python 3.4
-        import html
-
-        html_parser = html
 
 ##### Constants #####
 
@@ -136,7 +122,6 @@ class LEDStrip(object):
         pi_host = params.get("pi_host", "localhost")
         pig_port = params.get("pig_port", 8888)
 
-
         # Resolve interface - create if not provided!
         need_to_generate_new_interface = False  # Flag to see what we're doing
         if interface is None:
@@ -149,9 +134,9 @@ class LEDStrip(object):
             if iface_host is None:
                 need_to_generate_new_interface = True
                 logging.info("No existing iface host")
-            elif pi_host and unicode(pi_host) != unicode(iface_host):
+            elif pi_host and six.text_type(pi_host) != six.text_type(iface_host):
                 need_to_generate_new_interface = True
-                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pig_host))
+                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
             try:
                 iface_port = interface._port
             except AttributeError:
@@ -159,7 +144,7 @@ class LEDStrip(object):
                 logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             if iface_port is None:
                 need_to_generate_new_interface = True
-            elif pig_port and unicode(pig_port) != unicode(iface_port):
+            elif pig_port and six.text_type(pig_port) != six.text_type(iface_port):
                 need_to_generate_new_interface = True
             try:
                 iface_connected = interface.connected
@@ -589,7 +574,7 @@ class LEDStrip(object):
         if r and g is None and b is None and name is None:
             name = r
         try:
-            hex_value = NAMED_COLOURS[unicode(name).lower()]
+            hex_value = NAMED_COLOURS[six.text_type(name).lower()]
         except KeyError:
             pass
         else:
@@ -598,9 +583,9 @@ class LEDStrip(object):
         # Has a hex value been provided?
         if r and g is None and b is None and hex_value is None:
             hex_value = r
-        if unicode(hex_value)[0] != "#":
+        if six.text_type(hex_value)[0] != "#":
             hex_value = "#%s" % hex_value
-        if len(unicode(hex_value)) >= 4:
+        if len(six.text_type(hex_value)) >= 4:
             try:
                 return self.set_hex(hex_value, fade=fade, check=check)
             except ValueError:
@@ -611,7 +596,7 @@ class LEDStrip(object):
             r, g, b = r  # Unpack
         else:
             try:
-                r, g, b = unicode(r).split(",", 3)
+                r, g, b = six.text_type(r).split(",", 3)
             except ValueError:
                 pass
         try:

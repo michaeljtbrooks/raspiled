@@ -27,13 +27,9 @@ from named_colours import NAMED_COLOURS
 import copy
 import logging
 import configparser
+import six
+from six.moves.urllib.parse import urlencode
 
-try:
-    # python2
-    from urllib import urlencode
-except ImportError:
-    # python3
-    from urllib.parse import urlencode
 
 APP_NAME = "python ./raspiled_listener.py"
 
@@ -42,6 +38,7 @@ RASPILED_DIR = os.path.dirname(os.path.realpath(__file__))  # The directory we'r
 RESOLVED_USER_SETTINGS = CONFIG  # Alias for clarity
 
 
+@six.python_2_unicode_compatible
 class Preset(object):
     """
     Represents a preset for the web UI for the user to click on
@@ -77,7 +74,7 @@ class Preset(object):
             sunquery=self.sunquery)
         return out
 
-    def __unicode__(self):
+    def __str__(self):
         return self.render()
 
     @property
@@ -273,7 +270,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
             Preset(label="Magenta", display_colour="#FF00FF", fade="#FF00FF"),
             Preset(label="Crimson", display_colour="#FF0088", fade="#FF0088"),
             PresetRow(),
-            Preset(label="Tasty Teal", display_colour="#009882", fade="#00FF3C"),
+            Preset(label="Tasty Teal", display_colour="#009882", fade="#00FF4D"),
             Preset(label="Super Crimson", display_colour="#FF0077", fade="#FF0033"),
         ),
         "Sequences": (
@@ -288,7 +285,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
             Preset(label="&#x1f6a8; NeeNaw", display_gradient=("cyan", "blue"), jump="cyan,blue", milliseconds="100", is_sequence=True),
             Preset(label="&#x1f6a8; NeeNaw USA", display_gradient=("red", "blue"), jump="red,blue", milliseconds="100", is_sequence=True),
             Preset(label="&#x1f308; Full circle", display_gradient=(
-            "#FF0000", "#FF8800", "#FFFF00", "#88FF00", "#00FF00", "#00FF88", "#00FFFF", "#0088FF", "#0000FF", "#8800FF", "#FF00FF", "#FF0088"),
+                   "#FF0000", "#FF8800", "#FFFF00", "#88FF00", "#00FF00", "#00FF88", "#00FFFF", "#0088FF", "#0000FF", "#8800FF", "#FF00FF", "#FF0088"),
                    milliseconds=500, rotate="#FF0000,FF8800,FFFF00,88FF00,00FF00,00FF88,00FFFF,0088FF,0000FF,8800FF,FF00FF,FF0088", is_sequence=True),
         )
     }
@@ -685,6 +682,7 @@ class SmartRequest(Request, object):
         """
         if isinstance(names, (str, unicode)):
             names = [names]
+        val = NOT_SET
         for name in names:
             val = self.get_param_values(name=name, default=NOT_SET)
             if val is not NOT_SET:  # Once we find a valid value, continue
@@ -798,6 +796,7 @@ def checkClientAgainstWhitelist(ip, user, token):
         with open(config_path, 'w') as f:
             parser.write(f)
 
+    connection = False
     whitelist = parser.defaults()
     for ii in whitelist.keys():
         if ip == whitelist[ii]:
