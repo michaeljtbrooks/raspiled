@@ -23,7 +23,7 @@ import subprocess
 import time
 from time import sleep
 import threading
-from six.moves import html_parser
+from six.moves.html_parser import HTMLParser
 
 
 logging.basicConfig(format=b'[%(asctime)s RASPILED] %(message)s',
@@ -302,9 +302,10 @@ class LEDStrip(object):
         colours.extend(args)
         intermediate_list = []
         # Add in comma delimited stuff
+        h = HTMLParser()
         for colour_term in colours:
             if isinstance(colour_term, (str, unicode)):
-                colour_term_decoded = html_parser.unescape(colour_term)  # HTML char decode
+                colour_term_decoded = h.unescape(colour_term)  # HTML char decode
                 colour_terms_list = colour_term_decoded.split(",")
                 intermediate_list.extend(colour_terms_list)
             else:
