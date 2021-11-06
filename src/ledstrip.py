@@ -23,7 +23,7 @@ import subprocess
 import time
 from time import sleep
 import threading
-from six.moves import html_parser as HTMLParser
+from six.moves import html_parser
 
 
 logging.basicConfig(format=b'[%(asctime)s RASPILED] %(message)s',
