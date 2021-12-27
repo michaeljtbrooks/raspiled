@@ -3,12 +3,12 @@
 
     A collection of base classes and utilities for the Raspberry Pi powered elements of the Seamless project.
 """
-from __future__ import unicode_literals
 from collections import OrderedDict
 from copy import copy
 import json
 import logging
 import os
+from os import path
 from socket import SOL_SOCKET, SO_BROADCAST
 
 
@@ -16,6 +16,7 @@ from twisted.internet import task
 from twisted.internet.protocol import DatagramProtocol
 from twisted.web.resource import Resource
 from twisted.web.static import File
+
 
 from src.config import DEBUG
 
@@ -87,7 +88,7 @@ class RaspberryPiWebResource(Resource):
         Resource.__init__(self, *args, **kwargs)  # Super
         # Add in the static folder.
         static_folder = os.path.join(RASPBERRY_PI_DIR, self.STATIC_DIRECTORY)
-        self.putChild("static", File(static_folder))  # Any requests to /static serve from the filesystem.
+        self.putChild(b"static", File(static_folder))  # Any requests to /static serve from the filesystem.
 
     def getChild(self, path, request, *args, **kwargs):
         """
@@ -113,14 +114,6 @@ class RaspberryPiWebResource(Resource):
         if path in self.children:
             return self.children[path]
         return self.getChild(path, request)
-
-    @property
-    def clean_path(self):
-        """
-        Provides a clean version of the path
-        :return: <str>
-        """
-        return unicode(self._path or u"").rstrip("/")
 
     def before_action(self, *args, **kwargs):
         """
@@ -265,7 +258,7 @@ class RaspberryPiWebResource(Resource):
         :param request:
         :return: HTML or JSON for serving via Twisted web browser
         """
-        clean_path = unicode(self._path or u"").rstrip("/")
+        clean_path = request.path.rstrip(b"/")
 
         # First see if we're being asked for an informational resource
         for key_name, information_name in self.PARAM_TO_INFORMATION_MAPPING:

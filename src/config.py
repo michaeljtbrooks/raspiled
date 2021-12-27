@@ -1,7 +1,6 @@
 """
 Raspiled - Config
 """
-from __future__ import unicode_literals
 import configparser
 import logging
 import os
@@ -13,13 +12,13 @@ logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
 
 def ordereddict_to_int(ordered_dict):
     """
-    Converts an OrderedDict with unicode values to integers and/or floats (port and pins).
+    Converts an OrderedDict with str values to integers and/or floats (port and pins).
     @param ordered_dict: <OrderedDict> containg RASPILED configuration.
 
-    @returns: <OrderedDict> with integers instead of unicode values.
+    @returns: <OrderedDict> with integers instead of str values.
     """
     for key,value in ordered_dict.items():
-        if u"." in unicode(value):
+        if "." in value:
             casting_function = float
         else:
             casting_function = int
