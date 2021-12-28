@@ -10,7 +10,7 @@ pigpio==1.78
 prompt-toolkit==1.0.15
 ptyprocess==0.5.2
 Pygments==2.5.2
-scandir==1.7
+scandir==1.10.0
 simplegeneric==0.8.1
 six==1.15.0
 traitlets==4.3.2

@@ -10,7 +10,6 @@
 
     @author: Dr Mike Brooks
 """
-from __future__ import unicode_literals
 
 from named_colours import NAMED_COLOURS
 
@@ -26,8 +25,8 @@ import threading
 from six.moves.html_parser import HTMLParser
 
 
-logging.basicConfig(format=b'[%(asctime)s RASPILED] %(message)s',
-                    datefmt=b'%H:%M:%S', level=logging.INFO)
+logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
+                    datefmt='%H:%M:%S', level=logging.INFO)
 
 
 ##### Constants #####
@@ -58,14 +57,13 @@ def pigpiod_process():
     process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
     output, error = process.communicate()
 
-    if output == '':
+    if output == b'':
         logging.warn('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***')
         cmd = 'sudo pigpiod'
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
         output, error = process.communicate()
     else:
-        logging.info('PIGPIOD is running! PID: %s' % output.split('\n')[0])
-
+        logging.info('PIGPIOD is running! PID: %s', output.split(b'\n')[0])
 
 pigpiod_process()
 
@@ -81,7 +79,7 @@ class PiPinInterface(pigpio.pi, object):
     def __init__(self, params):
         super(PiPinInterface, self).__init__(params['pi_host'], params['pig_port'])
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Says who I am!
         """
@@ -91,7 +89,7 @@ class PiPinInterface(pigpio.pi, object):
         return "RaspberryPi Pins @ {ipv4}:{port}... {status}".format(ipv4=self._host, port=self._port, status=status)
 
     def __repr__(self):
-        return str(self.__unicode__())
+        return str(self)
 
 
 class LEDStrip(object):
@@ -297,15 +295,15 @@ class LEDStrip(object):
         concatenate a mixture of comma strings and items
         """
         colours = copy.deepcopy(colours)  # Ensure we don't bugger up original
-        if isinstance(colours, (str, unicode)):
+        if not isinstance(colours, list):
             colours = [colours]  # Listify
         colours.extend(args)
         intermediate_list = []
         # Add in comma delimited stuff
         h = HTMLParser()
         for colour_term in colours:
-            if isinstance(colour_term, (str, unicode)):
-                colour_term_decoded = h.unescape(colour_term)  # HTML char decode
+            if isinstance(colour_term, str):
+                colour_term_decoded = colour_term
                 colour_terms_list = colour_term_decoded.split(",")
                 intermediate_list.extend(colour_terms_list)
             else:
@@ -313,7 +311,7 @@ class LEDStrip(object):
         # Now sanitise the list again
         output_list = []
         for colour in intermediate_list:
-            if isinstance(colour, (str, unicode)):
+            if isinstance(colour, str):
                 colour_clean = colour.strip()
             output_list.append(colour)
         return output_list
@@ -348,10 +346,8 @@ class LEDStrip(object):
 
         return out_milliseconds
 
-    def __unicode__(self):
-        """
-        Print current colours as unicode
-        """
+    def __str__(self):
+        """Current colours as str"""
         return "{},{},{}".format(*self.rgb)
 
     def sync_channels(self):
@@ -540,7 +536,7 @@ class LEDStrip(object):
         gap_b = b - init_b
         n_steps = int(float(fade) / 20.0)  # 50Hz = 20 milliseconds
 
-        for step in xrange(0, n_steps):
+        for step in range(0, n_steps):
             fractional_progress = float(step) / n_steps
             cur_r = init_r + (gap_r * fractional_progress)
             cur_g = init_g + (gap_g * fractional_progress)
@@ -678,7 +674,7 @@ class LEDStrip(object):
         Minimum units of 10ms
         """
         ten_ms_steps = int(round(seconds * 100))
-        for _i in xrange(0, ten_ms_steps):
+        for _i in range(0, ten_ms_steps):
             if self._sequence_stop_signal:
                 break
             sleep(0.01)
@@ -790,8 +786,8 @@ class LEDStrip(object):
 
         @keyword seconds: <float> Number of seconds to do the sequence over
         @keyword milliseconds: <float> Number of milliseconds to do the sequence over, gets added to seconds if both provided
-        @keyword temp_start: <unicode> A colour temperature (in Kelvin) to start the sequence from
-        @keyword temp_end: <unicode> A colour temperature (in Kelvin) to end the sequence at
+        @keyword temp_start: <str> A colour temperature (in Kelvin) to start the sequence from
+        @keyword temp_end: <str> A colour temperature (in Kelvin) to end the sequence at
         @keyword fade: <Boolean> whether to fade between steps (True) or jump (False)
         """
 
@@ -847,7 +843,7 @@ class LEDStrip(object):
         # And run the loop
         t1 = time.time()
         check = True  # We only check the current values on the first run
-        for temp in xrange(temp_0, temp_n, temp_step):
+        for temp in range(temp_0, temp_n, temp_step):
             if self._sequence_stop_signal:  # Bail if sequence should stop
                 return None
             k = u"%sk" % temp

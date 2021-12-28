@@ -9,7 +9,6 @@
     
         @requires: twisted
 """
-from __future__ import unicode_literals
 import os
 import sys
 # Add some gymnastics so we can use imports relative to the parent dir.
@@ -38,7 +37,6 @@ RASPILED_DIR = os.path.dirname(os.path.realpath(__file__))  # The directory we'r
 RESOLVED_USER_SETTINGS = CONFIG  # Alias for clarity
 
 
-@six.python_2_unicode_compatible
 class Preset(object):
     """
     Represents a preset for the web UI for the user to click on
@@ -403,33 +401,33 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         Run when user wants to set a colour to a specified value
         """
-        set_colour = request.get_param("set", force=unicode)
+        set_colour = request.args[b"set"][0].decode()
         D("Set to: %s" % set_colour)
         return self.led_strip.set(set_colour)
 
     action__set.capability = {
         "param": "set",
         "description": "Sets the RGB strip to a single colour.",
-        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
-        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF.",
+        "value": "<str> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<str> A known named colour, or valid colour hex in the range #000000-#FFFFFF.",
         "widget": "colourpicker",
-        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+        "returns": "<str> The hex value of the colour the RGB strip has been set to."
     }
 
     def action__fade(self, request):
         """
         Run when user wants to set a colour to a specified value
         """
-        fade_colour = request.get_param("fade", force=unicode)
+        fade_colour = request.get_param("fade")
         logging.info("Fade to: %s" % fade_colour)
         return self.led_strip.fade(fade_colour)
 
     action__fade.capability = {
         "param": "fade",
         "description": "Fades the RGB strip from its current colour to a specified colour.",
-        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
-        "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF",
-        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+        "value": "<str> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "validity": "<str> A known named colour, or valid colour hex in the range #000000-#FFFFFF",
+        "returns": "<str> The hex value of the colour the RGB strip has been set to."
     }
 
     def action__sunrise(self, request):
@@ -438,8 +436,8 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         seconds = request.get_param(["seconds", "s", "sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
-        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
-        temp_end = request.get_param('temp_end', default=None, force=unicode)
+        temp_start = request.get_param(['temp_start', 'K'], default=None).decode()
+        temp_end = request.get_param('temp_end', default=None).decode()
         logging.info("Sunrise: %s seconds" % (seconds + (milliseconds / 1000.0)))
         return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
 
@@ -458,17 +456,17 @@ class RaspiledControlResource(RaspberryPiWebResource):
             {
                 "param": "temp_start",
                 "value": "The colour temperature you wish to start from (e.g. 500K).",
-                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "validity": "<str> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
                 "default": "6500K"
             },
             {
                 "param": "temp_end",
                 "value": "The colour temperature you wish to finish at (e.g. 4500K).",
-                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "validity": "<str> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
                 "default": "500K"
             }
         ],
-        "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
+        "returns": "<str> The hex value of the colour the RGB strip has been set to."
     }
 
     def action__sunset(self, request):
@@ -477,8 +475,8 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         seconds = request.get_param(["seconds", "s", "sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
-        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
-        temp_end = request.get_param('temp_end', default=None, force=unicode)
+        temp_start = request.get_param(['temp_start', 'K'], default=None).decode()
+        temp_end = request.get_param('temp_end', default=None).decode()
         logging.info("Sunset: %s seconds" % (seconds + (milliseconds / 1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
 
@@ -497,13 +495,13 @@ class RaspiledControlResource(RaspberryPiWebResource):
             {
                 "param": "temp_start",
                 "value": "The colour temperature you wish to start from (e.g. 500K).",
-                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "validity": "<str> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
                 "default": "500K"
             },
             {
                 "param": "temp_end",
                 "value": "The colour temperature you wish to finish at (e.g. 4500K).",
-                "validity": "<unicode> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
+                "validity": "<str> Matches a named colour temperature (50K - 15000K in 100 Kelvin steps)",
                 "default": "6500K"
             }
         ],
@@ -526,7 +524,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         "param": "jump",
         "description": "Hops from one colour to the next over an even period of time.",
         "value": "A comma delimited list of colours you wish to jump between.",
-        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "validity": "<str> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
         "optional_concurrent_parameters": [
             {
                 "param": "milliseconds",
@@ -541,7 +539,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
                 "default": "0",
             },
         ],
-        "returns": "<unicode> The first hex value of sequence."
+        "returns": "<str> The first hex value of sequence."
     }
 
     def action__rotate(self, request):
@@ -560,7 +558,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         "param": "rotate",
         "description": "Fades from one colour to the next over an even period of time.",
         "value": "A comma delimited list of colours you wish to cross-fade between.",
-        "validity": "<unicode> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
+        "validity": "<str> valid colour names or hex values separated by commas (e.g. red,blue,green,cyan,#FF00FF)",
         "optional_concurrent_parameters": [
             {
                 "param": "milliseconds",
@@ -575,7 +573,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
                 "default": "0",
             },
         ],
-        "returns": "<unicode> The first hex value of sequence."
+        "returns": "<str> The first hex value of sequence."
     }
 
     def action__stop(self, request):
@@ -588,7 +586,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         "param": "stop",
         "description": "Halts the current sequence or fade.",
         "value": "",
-        "returns": "<unicode> The hex value of colour the RGB strip got halted on."
+        "returns": "<str> The hex value of colour the RGB strip got halted on."
     }
 
     def action__off(self, request):
@@ -602,7 +600,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         "param": "off",
         "description": "Stops any fades or sequences. Quickly Fades the RGB strip to black (no light)",
         "value": "",
-        "returns": "<unicode> The hex value of colour the RGB strip ends up at (#000000)."
+        "returns": "<str> The hex value of colour the RGB strip ends up at (#000000)."
     }
 
     def information__status(self, request, *args, **kwargs):
@@ -659,14 +657,17 @@ class SmartRequest(Request, object):
     def __init__(self, *args, **kwargs):
         super(SmartRequest, self).__init__(*args, **kwargs)
 
-    def get_param_values(self, name, default=None):
+    def get_param_values(self, name, default=[]):
         """
         Failsafe way of getting querystring get and post params from the Request object
         If not provided, will return default
         
         @return: ["val1","val2"] LIST of arguments, or the default
         """
-        return self.args.get(name, default)
+        try:
+            return [s.decode() for s in self.args[name.encode()]]
+        except KeyError:
+            return default
 
     get_params = get_param_values  # Alias
     get_list = get_param_values  # Alias
@@ -680,7 +681,7 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
-        if isinstance(names, (str, unicode)):
+        if not isinstance(names, list):
             names = [names]
         val = NOT_SET
         for name in names:
@@ -713,6 +714,8 @@ class SmartRequest(Request, object):
         Returns True or the value if any of the param names given by args exist
         """
         for param_name in param_names:
+            if isinstance(param_name, str):
+                param_name = param_name.encode()
             try:
                 return self.args[param_name] or True
             except KeyError:
@@ -813,9 +816,9 @@ def start_if_not_running():
     Checks if the process is running, if not, starts it!
     """
     pids = get_matching_pids(APP_NAME, exclude_self=True)  # Will remove own PID
-    pids = filter(bool, pids)
+    pids = list(filter(bool, pids))
     if not pids:  # No match! Implies we need to fire up the listener
-        logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
+        logging.info("[STARTING] Raspiled Listener with PID %s", os.getpid())
         # First the web
         factory = RaspiledControlSite(timeout=8)  # 8s timeout
         try:
@@ -827,7 +830,7 @@ def start_if_not_running():
         # factory.setup_broadcasting(reactor)  # Uncomment to broadcast stuff over network!
         reactor.run()
     else:
-        logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
+        logging.info("Raspiled Listener already running with PID %s", ", ".join(pids))
 
 
 if __name__ == "__main__":

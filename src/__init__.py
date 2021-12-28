@@ -5,6 +5,5 @@
     
     @author: Dr Mike Brooks
 """
-from __future__ import unicode_literals
 
 from ledstrip import LEDStrip

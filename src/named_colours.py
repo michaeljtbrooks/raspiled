@@ -5,7 +5,6 @@
     
     Named colours (CSS4 set)
 """
-from __future__ import unicode_literals
 
 CSS4_COLOURS = {
     'indigo': '#4B0082',
