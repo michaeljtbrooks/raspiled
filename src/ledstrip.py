@@ -12,6 +12,12 @@
 """
 from __future__ import unicode_literals
 
+import colorsys
+import math
+
+import colour
+import numpy as np
+
 from named_colours import NAMED_COLOURS
 
 import copy
@@ -227,9 +233,121 @@ class LEDStrip(object):
         """
         return '#%02x%02x%02x' % (int(r), int(g), int(b))
 
-    RE_COLOUR_RGB = re.compile(r"rgb\(([0-9]{1,3}),\s?([0-9]{1,3}),\s?([0-9]{1,3})", re.IGNORECASE)
+    @classmethod
+    def hsv_to_rgb(cls, hue, saturation, value=255, scale_factor=255.0):
+        """
+        Convert hue and saturation to RGB. Value is optional and is set at 255 when omitted
+        :param hue:
+        :param saturation:
+        :param value:
+        :param scale_factor: What to scale the normally 0-1 colorsys space to
+        :return:
+        """
+        scale_factor = float(scale_factor)
+        r, g, b = colorsys.hsv_to_rgb(hue/scale_factor, saturation/scale_factor, value/scale_factor)
+        return int(round(r*scale_factor)), int(round(g*scale_factor)), int(round(b*scale_factor)),
+
+    @classmethod
+    def rgb_to_hsv(cls, red, green, blue, scale_factor=255.0):
+        """
+        Convert red, green, blue to HSV
+        """
+        scale_factor = float(scale_factor)
+        h, s, v = colorsys.rgb_to_hsv(red/scale_factor, green/scale_factor, blue/scale_factor)
+        return int(round(h * scale_factor)), int(round(s * scale_factor)), int(round(v * scale_factor)),
+
+    @classmethod
+    def kelvin_to_rgb(cls, colour_temperature):
+        """
+        Converts colour temperature in kelvin into RGB
+        :param colour_temperature:
+        :return:
+        """
+        if isinstance(colour_temperature, (six.text_type, six.binary_type)):
+            colour_temperature = six.u(colour_temperature)
+            colour_temperature = colour_temperature.strip(" ").strip("K")
+        colour_temperature = int(colour_temperature)  # May raise ValueError
+
+        # range check
+        if colour_temperature < 1000:
+            colour_temperature = 1000
+        elif colour_temperature > 40000:
+            colour_temperature = 40000
+
+        tmp_internal = colour_temperature / 100.0
+
+        # red
+        if tmp_internal <= 66:
+            red = 255
+        else:
+            tmp_red = 329.698727446 * math.pow(tmp_internal - 60, -0.1332047592)
+            if tmp_red < 0:
+                red = 0
+            elif tmp_red > 255:
+                red = 255
+            else:
+                red = tmp_red
+
+        # green
+        if tmp_internal <= 66:
+            tmp_green = 99.4708025861 * math.log(tmp_internal) - 161.1195681661
+            if tmp_green < 0:
+                green = 0
+            elif tmp_green > 255:
+                green = 255
+            else:
+                green = tmp_green
+        else:
+            tmp_green = 288.1221695283 * math.pow(tmp_internal - 60, -0.0755148492)
+            if tmp_green < 0:
+                green = 0
+            elif tmp_green > 255:
+                green = 255
+            else:
+                green = tmp_green
+
+        # blue
+        if tmp_internal >= 66:
+            blue = 255
+        elif tmp_internal <= 19:
+            blue = 0
+        else:
+            tmp_blue = 138.5177312231 * math.log(tmp_internal - 10) - 305.0447927307
+            if tmp_blue < 0:
+                blue = 0
+            elif tmp_blue > 255:
+                blue = 255
+            else:
+                blue = tmp_blue
+
+        return red, green, blue
+
+    @classmethod
+    def rgb_to_kelvin(cls, r, g, b):
+        """
+        Given a tuple of red, green, blue scaled 0-255, return the closest colour temperature in kelvin
+        :param r:
+        :param g:
+        :param b:
+        :return: <int> or <None>
+        """
+        if six.PY2:  # the Colour library hadn't implemented the reverse lookup before moving to Python3
+            return ""
+        r = float(r or 0)
+        g = float(g or 0)
+        b = float(b or 0)
+        rgb_array = np.array([r, g, b])
+        xyz_array = colour.sRGB_to_XYZ(rgb_array / 255)
+        xy_array = colour.XYZ_to_xy(xyz_array)
+        kelvin = colour.xy_to_CCT(xy_array, 'hernandez1999')
+        return kelvin
+
+    RE_COLOUR_RGB = re.compile(r"(?:rgb)?\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
     RE_COLOUR_HEX_6 = re.compile(r'^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$')
     RE_COLOUR_HEX_3 = re.compile(r'^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$')
+    RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
+    RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
+    RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7})K", re.IGNORECASE)
 
     @classmethod
     def colour_to_rgb_tuple(cls, col_str):
@@ -240,6 +358,8 @@ class LEDStrip(object):
         
         @return: <tuple> (r,g,b) component values converted into base 10 integers in range (0-255)
         """
+
+        # Might be a hex expression
         hex_6 = cls.RE_COLOUR_HEX_6.search(col_str)
         if hex_6:
             # Simply converts hex directly to dec
@@ -248,9 +368,27 @@ class LEDStrip(object):
         if hex_3:
             # First must convert single value range 0-15 to range 0-255
             return tuple(int(int(c, 16) / 15.0 * 255.0) for c in hex_3.groups())
+
+        # Might already be an RGB expression
         rgb = cls.RE_COLOUR_RGB.search(col_str)
         if rgb:
             return tuple(int(c) for c in rgb.groups())  # Direct output of tuple from regex!
+
+        # Might be an hsv or hs:
+        hsv = cls.RE_COLOUR_HSV.search(col_str)
+        if hsv:
+            h, s, v = tuple(int(c) for c in hsv.groups())
+            return cls.hsv_to_rgb(h, s, v)
+        hs_ = cls.RE_COLOUR_HSV.search(col_str)
+        if hs_:
+            h, s = tuple(int(c) for c in hsv.groups())
+            return cls.hsv_to_rgb(h, s, 255)
+
+        kelvin = cls.RE_COLOUR_KELVIN.search(col_str)
+        if kelvin:
+            temp_k = int(kelvin.group(1))
+            return cls.kelvin_to_rgb(colour_temperature=temp_k)
+
         return None  # Otherwise canny do i' captain
 
     @classmethod
@@ -424,6 +562,25 @@ class LEDStrip(object):
         r, g, b = self.rgb
         return self.rgb_to_hex(r, g, b)
 
+    @property
+    def hsv(self):
+        """
+        Calibration-adjusted hsv value
+        """
+        r, g, b = self.rgb
+        return self.rgb_to_hsv(r, g, b, scale_factor=255.0)
+
+    @property
+    def hs(self):
+        """
+        Calibration-adjusted hsv value
+        """
+        r, g, b = self.rgb
+        h, s, v = self.rgb_to_hsv(r, g, b, scale_factor=255.0)
+        return h, s
+
+
+
     def generate_new_interface(self, params):
         """
         Builds a new interface, stores it in self.iface
@@ -540,7 +697,7 @@ class LEDStrip(object):
         gap_b = b - init_b
         n_steps = int(float(fade) / 20.0)  # 50Hz = 20 milliseconds
 
-        for step in xrange(0, n_steps):
+        for step in range(0, n_steps):
             fractional_progress = float(step) / n_steps
             cur_r = init_r + (gap_r * fractional_progress)
             cur_g = init_g + (gap_g * fractional_progress)
@@ -564,6 +721,17 @@ class LEDStrip(object):
             out = self.set_rgb(r, g, b)
         return self.rgb_to_hex(*out)
 
+    def set_hsv(self, hue, saturation, value=255, fade=False, check=True):
+        """
+        Turns a hue and saturation in 0-255 and optional value string into an rgb tuple of 255,255,255
+        """
+        r, g, b = self.hsv_to_rgb(hue, saturation, value)
+        if fade:
+            out = self.fade_to_rgb(r, g, b, fade=fade, check=check)
+        else:
+            out = self.set_rgb(r, g, b)
+        return self.rgb_to_hsv(*out)
+
     def set(self, r=None, g=None, b=None, hex_value=None, name=None, fade=False, check=True):
         """
         Sets the LEDs to the specified colour
@@ -574,32 +742,23 @@ class LEDStrip(object):
         # Has a named colour been provided?
         if r and g is None and b is None and name is None:
             name = r
-        try:
-            hex_value = NAMED_COLOURS[six.text_type(name).lower()]
-        except KeyError:
-            pass
-        else:
-            return self.set_hex(hex_value, fade=fade, check=check)
 
-        # Has a hex value been provided?
-        if r and g is None and b is None and hex_value is None:
-            hex_value = r
-        if six.text_type(hex_value)[0] != "#":
-            hex_value = "#%s" % hex_value
-        if len(six.text_type(hex_value)) >= 4:
+        if name:
             try:
+                hex_value = NAMED_COLOURS[six.text_type(name).lower()]
+            except KeyError:
+                pass
+            else:
                 return self.set_hex(hex_value, fade=fade, check=check)
-            except ValueError:
-                pass
 
-        # Has a tuple been provided, or comma string?
-        if r and isinstance(r, (tuple, list)):
-            r, g, b = r  # Unpack
-        else:
+            # Try our regex based resolver:
             try:
-                r, g, b = six.text_type(r).split(",", 3)
-            except ValueError:
-                pass
+                r, g, b = self.colour_to_rgb_tuple(name)
+            except (TypeError, IndexError, ValueError):
+                logging.info("WARNING: no colour identified by '%s'. Using current colour." % r)
+                return self.rgb
+
+        # Finally check this works
         try:
             r = int(r)
             g = int(g)
@@ -669,7 +828,7 @@ class LEDStrip(object):
     """
     Sequences run inside a separate thread so that they do not block the web client
     from returning a page. They should always be called via run_sequence, because
-    this ensures that a 
+    this ensures that the LEDStrip instance remains responsive. 
     """
 
     def sleep(self, seconds):
@@ -678,7 +837,7 @@ class LEDStrip(object):
         Minimum units of 10ms
         """
         ten_ms_steps = int(round(seconds * 100))
-        for _i in xrange(0, ten_ms_steps):
+        for _i in range(0, ten_ms_steps):
             if self._sequence_stop_signal:
                 break
             sleep(0.01)

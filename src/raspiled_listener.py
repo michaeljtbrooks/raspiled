@@ -410,7 +410,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
     action__set.capability = {
         "param": "set",
         "description": "Sets the RGB strip to a single colour.",
-        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA'), or a comma delimited list of integers for r,g,b.",
         "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF.",
         "widget": "colourpicker",
         "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
@@ -427,7 +427,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
     action__fade.capability = {
         "param": "fade",
         "description": "Fades the RGB strip from its current colour to a specified colour.",
-        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA').",
+        "value": "<unicode> A named colour (e.g. 'pink') or colour hex value (e.g. '#19BECA'), or a comma delimited list of integers for r,g,b.",
         "validity": "<unicode> A known named colour, or valid colour hex in the range #000000-#FFFFFF",
         "returns": "<unicode> The hex value of the colour the RGB strip has been set to."
     }

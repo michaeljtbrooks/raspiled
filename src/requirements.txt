@@ -3,6 +3,8 @@ decorator==4.3.0
 enum34==1.1.6
 ipython==5.6.0
 ipython-genutils==0.2.0
+numpy
+colour
 pathlib2==2.3.0
 pexpect==4.5.0
 pickleshare==0.7.4
@@ -12,7 +14,7 @@ ptyprocess==0.5.2
 Pygments==2.5.2
 scandir==1.7
 simplegeneric==0.8.1
-six==1.15.0
+six
 traitlets==4.3.2
 wcwidth==0.1.7
 twisted
