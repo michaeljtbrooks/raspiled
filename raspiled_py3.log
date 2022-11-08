@@ -1,0 +1,128 @@
+[09:16:26 RASPILED] PIGPIOD is running! PID: 
+[09:18:25 RASPILED] PIGPIOD is running! PID: 
+[09:18:25 RASPILED] Raspiled Listener already running with PID 
+[09:21:38 RASPILED] PIGPIOD is running! PID: 
+[09:21:38 RASPILED] Raspiled Listener already running with PID 
+[09:21:59 RASPILED] PIGPIOD is running! PID: 
+[09:21:59 RASPILED] Raspiled Listener already running with PID 
+[09:22:11 RASPILED] PIGPIOD is running! PID: 
+[09:22:11 RASPILED] [STARTING] Raspiled Listener with PID 24903
+[09:22:11 RASPILED]  Interface not connected. Cannot read PWM of pin #27.
+[09:22:11 RASPILED]  Interface not connected. Cannot read PWM of pin #17.
+[09:22:11 RASPILED]  Interface not connected. Cannot read PWM of pin #22.
+[09:23:30 RASPILED] PIGPIOD is running! PID: 
+[09:23:30 RASPILED] [STARTING] Raspiled Listener with PID 25176
+[09:23:30 RASPILED]  Interface not connected. Cannot read PWM of pin #27.
+[09:23:30 RASPILED]  Interface not connected. Cannot read PWM of pin #17.
+[09:23:30 RASPILED]  Interface not connected. Cannot read PWM of pin #22.
+[09:23:34 RASPILED] 	LEDstrip: exiting sequence threads...
+[09:23:34 RASPILED]  Interface not connected. Cannot read PWM of pin #27.
+[09:23:34 RASPILED]  Interface not connected. Cannot read PWM of pin #17.
+[09:23:34 RASPILED]  Interface not connected. Cannot read PWM of pin #22.
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:23:34 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:23:34 RASPILED] 		...done
+[09:26:14 RASPILED] PIGPIOD is running! PID: 
+[09:26:15 RASPILED] [STARTING] Raspiled Listener with PID 29842
+[09:26:15 RASPILED]  Interface not connected. Cannot read PWM of pin #27.
+[09:26:15 RASPILED]  Interface not connected. Cannot read PWM of pin #17.
+[09:26:15 RASPILED]  Interface not connected. Cannot read PWM of pin #22.
+[09:27:27 RASPILED] 	LEDstrip: exiting sequence threads...
+[09:27:27 RASPILED]  Interface not connected. Cannot read PWM of pin #27.
+[09:27:27 RASPILED]  Interface not connected. Cannot read PWM of pin #17.
+[09:27:27 RASPILED]  Interface not connected. Cannot read PWM of pin #22.
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #27 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #17 would be 0
+[09:27:27 RASPILED]  Interface not connected. Cannot output to pins. PWM of pin #22 would be 0
+[09:27:27 RASPILED] 		...done

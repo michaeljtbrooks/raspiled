@@ -11,7 +11,7 @@ import logging
 import os
 from socket import SOL_SOCKET, SO_BROADCAST
 
-
+import six
 from twisted.internet import task
 from twisted.internet.protocol import DatagramProtocol
 from twisted.web.resource import Resource
@@ -87,7 +87,7 @@ class RaspberryPiWebResource(Resource):
         Resource.__init__(self, *args, **kwargs)  # Super
         # Add in the static folder.
         static_folder = os.path.join(RASPBERRY_PI_DIR, self.STATIC_DIRECTORY)
-        self.putChild("static", File(static_folder))  # Any requests to /static serve from the filesystem.
+        self.putChild(b"static", File(static_folder))  # Any requests to /static serve from the filesystem.
 
     def getChild(self, path, request, *args, **kwargs):
         """
@@ -120,7 +120,7 @@ class RaspberryPiWebResource(Resource):
         Provides a clean version of the path
         :return: <str>
         """
-        return unicode(self._path or u"").rstrip("/")
+        return six.text_type(self._path or u"").rstrip("/")
 
     def before_action(self, *args, **kwargs):
         """
@@ -265,7 +265,7 @@ class RaspberryPiWebResource(Resource):
         :param request:
         :return: HTML or JSON for serving via Twisted web browser
         """
-        clean_path = unicode(self._path or u"").rstrip("/")
+        clean_path = six.text_type(self._path or u"").rstrip("/")
 
         # First see if we're being asked for an informational resource
         for key_name, information_name in self.PARAM_TO_INFORMATION_MAPPING:

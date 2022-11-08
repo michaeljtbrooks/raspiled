@@ -16,7 +16,7 @@ import sys
 my_dir = os.path.dirname(os.path.realpath(__file__))  # The directory we're running in
 sys.path.append(os.path.dirname(my_dir))  # Parent dir
 
-from src.config import CONFIG, get_setting, DEBUG
+from src.config import CONFIG, get_setting, DEBUG, logger
 from utils import *
 from ledstrip import LEDStrip
 
@@ -25,7 +25,6 @@ from twisted.internet import reactor, endpoints
 from twisted.web.server import Site, Request
 from named_colours import NAMED_COLOURS
 import copy
-import logging
 import configparser
 import six
 from six.moves.urllib.parse import urlencode
@@ -403,7 +402,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         Run when user wants to set a colour to a specified value
         """
-        set_colour = request.get_param("set", force=unicode)
+        set_colour = request.get_param("set", force=six.text_type)
         D("Set to: %s" % set_colour)
         return self.led_strip.set(set_colour)
 
@@ -420,8 +419,8 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         Run when user wants to set a colour to a specified value
         """
-        fade_colour = request.get_param("fade", force=unicode)
-        logging.info("Fade to: %s" % fade_colour)
+        fade_colour = request.get_param("fade", force=six.text_type)
+        logger.info("Fade to: %s" % fade_colour)
         return self.led_strip.fade(fade_colour)
 
     action__fade.capability = {
@@ -438,9 +437,9 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         seconds = request.get_param(["seconds", "s", "sunrise"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
-        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
-        temp_end = request.get_param('temp_end', default=None, force=unicode)
-        logging.info("Sunrise: %s seconds" % (seconds + (milliseconds / 1000.0)))
+        temp_start = request.get_param(['temp_start', 'K'], default=None, force=six.text_type)
+        temp_end = request.get_param('temp_end', default=None, force=six.text_type)
+        logger.info("Sunrise: %s seconds" % (seconds + (milliseconds / 1000.0)))
         return self.led_strip.sunrise(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
 
     action__sunrise.capability = {
@@ -477,9 +476,9 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         seconds = request.get_param(["seconds", "s", "sunset"], default=10.0, force=float)
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
-        temp_start = request.get_param(['temp_start', 'K'], default=None, force=unicode)
-        temp_end = request.get_param('temp_end', default=None, force=unicode)
-        logging.info("Sunset: %s seconds" % (seconds + (milliseconds / 1000.0)))
+        temp_start = request.get_param(['temp_start', 'K'], default=None, force=six.text_type)
+        temp_end = request.get_param('temp_end', default=None, force=six.text_type)
+        logger.info("Sunset: %s seconds" % (seconds + (milliseconds / 1000.0)))
         return self.led_strip.sunset(seconds=seconds, milliseconds=milliseconds, temp_start=temp_start, temp_end=temp_end)
 
     action__sunset.capability = {
@@ -519,7 +518,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
         self.led_strip.stop_current_sequence()  # Terminate any crap that's going on
         total_seconds = (seconds + (milliseconds / 1000.0))
-        logging.info("Jump: %s, %s seconds" % (jump_colours, total_seconds))
+        logger.info("Jump: %s, %s seconds" % (jump_colours, total_seconds))
         return self.led_strip.jump(jump_colours, seconds=seconds, milliseconds=milliseconds)  # Has its own colour sanitisation routine
 
     action__jump.capability = {
@@ -553,7 +552,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         milliseconds = request.get_param(["milliseconds", "ms"], default=0.0, force=float)
         self.led_strip.stop_current_sequence()  # Terminate any crap that's going on
         total_seconds = (seconds + (milliseconds / 1000.0))
-        logging.info("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
+        logger.info("Rotate: %s, %s seconds" % (rotate_colours, total_seconds))
         return self.led_strip.rotate(rotate_colours, seconds=seconds, milliseconds=milliseconds)  # Has its own colour sanitisation routine
 
     action__rotate.capability = {
@@ -595,7 +594,7 @@ class RaspiledControlResource(RaspberryPiWebResource):
         """
         Turns the strip off
         """
-        logging.info("Off!")
+        logger.info("Off!")
         return self.led_strip.off()
 
     action__off.capability = {
@@ -680,7 +679,7 @@ class SmartRequest(Request, object):
         @keyword default: The default value to return if we cannot get a valid value
         @keyword force: <type> A class / type to force the output into. Default is returned if we cannot force the value into this type 
         """
-        if isinstance(names, (str, unicode)):
+        if isinstance(names, (six.text_type, six.binary_type)):
             names = [names]
         val = NOT_SET
         for name in names:
@@ -800,7 +799,7 @@ def checkClientAgainstWhitelist(ip, user, token):
     whitelist = parser.defaults()
     for ii in whitelist.keys():
         if ip == whitelist[ii]:
-            logging.info('Client registered')
+            logger.info('Client registered')
             connection = True
             break
         else:
@@ -813,9 +812,9 @@ def start_if_not_running():
     Checks if the process is running, if not, starts it!
     """
     pids = get_matching_pids(APP_NAME, exclude_self=True)  # Will remove own PID
-    pids = filter(bool, pids)
+    pids = list(filter(bool, pids))
     if not pids:  # No match! Implies we need to fire up the listener
-        logging.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
+        logger.info("[STARTING] Raspiled Listener with PID %s" % str(os.getpid()))
         # First the web
         factory = RaspiledControlSite(timeout=8)  # 8s timeout
         try:
@@ -827,7 +826,7 @@ def start_if_not_running():
         # factory.setup_broadcasting(reactor)  # Uncomment to broadcast stuff over network!
         reactor.run()
     else:
-        logging.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
+        logger.info("Raspiled Listener already running with PID %s" % ", ".join(pids))
 
 
 if __name__ == "__main__":

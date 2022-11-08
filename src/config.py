@@ -5,10 +5,14 @@ from __future__ import unicode_literals
 import configparser
 import logging
 import os
+import six
 
 
-logging.basicConfig(format='[%(asctime)s RASPILED] %(message)s',
-                    datefmt='%H:%M:%S', level=logging.INFO)
+logger = logging.getLogger("raspiled")
+logger.setLevel(logging.INFO)
+logging_handler = logging.FileHandler(filename="./raspiled_py3.log", encoding='utf-8', mode='a+')
+logging_handler.setFormatter(logging.Formatter(fmt='[%(asctime)s RASPILED] %(message)s', datefmt='%H:%M:%S'))
+logger.addHandler(logging_handler)
 
 
 def ordereddict_to_int(ordered_dict):
@@ -18,8 +22,8 @@ def ordereddict_to_int(ordered_dict):
 
     @returns: <OrderedDict> with integers instead of unicode values.
     """
-    for key,value in ordered_dict.items():
-        if u"." in unicode(value):
+    for key, value in ordered_dict.items():
+        if u"." in six.ensure_text(value, "utf-8"):
             casting_function = float
         else:
             casting_function = int
@@ -70,8 +74,8 @@ if os.path.exists(config_path):
 else:
     config_file_needs_writing = True
     # No config file exists, give the user a chance to specify their pin configuration
-    logging.warn('No config file found. Creating default {} file.'.format(config_path))
-    logging.warn('*** Please edit this file as needed. ***')
+    logging.warning('No config file found. Creating default {} file.'.format(config_path))
+    logging.warning('*** Please edit this file as needed. ***')
 
     # Allow user to customise their pin config
     while True:
@@ -80,13 +84,13 @@ else:
             user_input_green_pin = int(input('GREEN pin number [{}]:'.format(DEFAULTS["green_pin"])) or DEFAULTS["green_pin"])
             user_input_blue_pin = int(input('BLUE pin number [{}]:'.format(DEFAULTS["blue_pin"])) or DEFAULTS["blue_pin"])
         except (ValueError, TypeError):
-            logging.warn('*** The input should be an integer ***')
+            logging.warning('*** The input should be an integer ***')
         else:
             DEFAULTS['red_pin'] = user_input_red_pin
             DEFAULTS['green_pin'] = user_input_green_pin
             DEFAULTS['blue_pin'] = user_input_blue_pin
             if DEFAULTS['red_pin'] == DEFAULTS['blue_pin'] or DEFAULTS['red_pin'] == DEFAULTS['green_pin'] or DEFAULTS['green_pin'] == DEFAULTS['blue_pin']:
-                logging.warn('*** The pin number should be different for all pins. ***')
+                logging.warning('*** The pin number should be different for all pins. ***')
             else:
                 config_file_needs_writing = True
                 break
@@ -102,9 +106,9 @@ while True:
             raise RuntimeError(
                 "*** You cannot have the web server running on port {} while the pigpio daemon is also running on that port! ***".format(DEFAULTS["pi_port"]))
     except RuntimeError as e:
-        logging.warn(e)
+        logging.warning(e)
     except (ValueError, TypeError):
-        logging.warn("*** You have specified an invalid port number for the Raspiled web server ({}) or the Pigpio daemon ({}) ***".format(DEFAULTS["pi_port"],
+        logging.warning("*** You have specified an invalid port number for the Raspiled web server ({}) or the Pigpio daemon ({}) ***".format(DEFAULTS["pi_port"],
                                                                                                                                            DEFAULTS[
                                                                                                                                                "pig_port"]))
     else:  # Config is fine... carry on
@@ -116,7 +120,7 @@ while True:
         user_pi_port = int(input('Raspiled web server port (e.g. 9090) [{}]:'.format(DEFAULTS["pi_port"])) or DEFAULTS["pi_port"])
         user_pig_port = int(input('Pigpio daemon port (e.g. 8888) [{}]:'.format(DEFAULTS["pig_port"])) or DEFAULTS["pig_port"])
     except (ValueError, TypeError):
-        logging.warn('*** The input should be an integer ***')
+        logging.warning('*** The input should be an integer ***')
     else:
         config_file_needs_writing = True
 

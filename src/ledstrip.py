@@ -21,7 +21,7 @@ import numpy as np
 from named_colours import NAMED_COLOURS
 
 import copy
-import logging
+from src.config import  logger
 import pigpio
 import re
 import six
@@ -30,10 +30,6 @@ import time
 from time import sleep
 import threading
 from six.moves.html_parser import HTMLParser
-
-
-logging.basicConfig(format=b'[%(asctime)s RASPILED] %(message)s',
-                    datefmt=b'%H:%M:%S', level=logging.INFO)
 
 
 ##### Constants #####
@@ -65,12 +61,12 @@ def pigpiod_process():
     output, error = process.communicate()
 
     if output == '':
-        logging.warn('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***')
+        logger.info('*** [STARTING PIGPIOD] i.e. "sudo pigpiod" ***')
         cmd = 'sudo pigpiod'
         process = subprocess.Popen(cmd.split(), stdout=subprocess.PIPE)
-        output, error = process.communicate()
+        _output, _error = process.communicate()
     else:
-        logging.info('PIGPIOD is running! PID: %s' % output.split('\n')[0])
+        logger.info('PIGPIOD is running! PID: %s', six.ensure_text(output, "utf-8").split('\n')[0])
 
 
 pigpiod_process()
@@ -139,15 +135,15 @@ class LEDStrip(object):
                 iface_host = None
             if iface_host is None:
                 need_to_generate_new_interface = True
-                logging.info("No existing iface host")
+                logger.info("No existing iface host")
             elif pi_host and six.text_type(pi_host) != six.text_type(iface_host):
                 need_to_generate_new_interface = True
-                logging.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
+                logger.info("iface host different to intended: iface=%s vs pi=%s" % (iface_host, pi_host))
             try:
                 iface_port = interface._port
             except AttributeError:
                 iface_port = None
-                logging.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
+                logger.info("iface port different to intended: iface=%s vs pi=%s" % (iface_port, pig_port))
             if iface_port is None:
                 need_to_generate_new_interface = True
             elif pig_port and six.text_type(pig_port) != six.text_type(iface_port):
@@ -157,7 +153,7 @@ class LEDStrip(object):
             except AttributeError:
                 iface_connected = False
             if not iface_connected:
-                logging.info("iface not connected!")
+                logger.info("iface not connected!")
                 need_to_generate_new_interface = True
         if need_to_generate_new_interface:
             self.iface = self.generate_new_interface(params)
@@ -193,10 +189,10 @@ class LEDStrip(object):
         # Test values
         try:
             if value < lower:
-                logging.warn(" LEDStrip.lim(): Value %s is less than lower limit %s. Setting to %s." % (value, lower, less_than_lower_default))
+                logger.warning(" LEDStrip.lim(): Value %s is less than lower limit %s. Setting to %s." % (value, lower, less_than_lower_default))
                 return float(less_than_lower_default)
             if value > upper:
-                logging.warn(" LEDStrip.lim(): Value %s is greater than upper limit %s. Setting to %s" % (value, upper, greater_than_upper_default))
+                logger.warning(" LEDStrip.lim(): Value %s is greater than upper limit %s. Setting to %s" % (value, upper, greater_than_upper_default))
                 return float(greater_than_upper_default)
         except (ValueError, TypeError, AttributeError):
             return float(less_than_lower_default)
@@ -420,7 +416,6 @@ class LEDStrip(object):
             lum = float(0.2126 * pow(r / div, 2.2)) + float(0.7152 * pow(g / div, 2.2)) + float(0.0722 * pow(b / div, 2.2))
         except (TypeError, ValueError):
             return dark_default
-        # logging.info ("Luminosity: %s" % lum)
         # Decision gate:
         if lum >= trigger:  # Light background, need dark text
             return "%s%s" % (hashed, dark_default)
@@ -435,14 +430,14 @@ class LEDStrip(object):
         concatenate a mixture of comma strings and items
         """
         colours = copy.deepcopy(colours)  # Ensure we don't bugger up original
-        if isinstance(colours, (str, unicode)):
+        if isinstance(colours, (six.text_type, six.binary_type)):
             colours = [colours]  # Listify
         colours.extend(args)
         intermediate_list = []
         # Add in comma delimited stuff
         h = HTMLParser()
         for colour_term in colours:
-            if isinstance(colour_term, (str, unicode)):
+            if isinstance(colour_term, (six.text_type, six.binary_type)):
                 colour_term_decoded = h.unescape(colour_term)  # HTML char decode
                 colour_terms_list = colour_term_decoded.split(",")
                 intermediate_list.extend(colour_terms_list)
@@ -450,10 +445,10 @@ class LEDStrip(object):
                 intermediate_list.append(colour_term)
         # Now sanitise the list again
         output_list = []
-        for colour in intermediate_list:
-            if isinstance(colour, (str, unicode)):
-                colour_clean = colour.strip()
-            output_list.append(colour)
+        for this_colour in intermediate_list:
+            if isinstance(this_colour, (six.text_type, six.binary_type)):
+                this_colour = this_colour.strip()
+            output_list.append(this_colour)
         return output_list
 
     @classmethod
@@ -579,8 +574,6 @@ class LEDStrip(object):
         h, s, v = self.rgb_to_hsv(r, g, b, scale_factor=255.0)
         return h, s
 
-
-
     def generate_new_interface(self, params):
         """
         Builds a new interface, stores it in self.iface
@@ -605,9 +598,9 @@ class LEDStrip(object):
             try:
                 self.iface.set_PWM_dutycycle(pin, value)
             except (AttributeError, IOError):
-                logging.error(" Cannot output to pins. PWM of pin #%s would be %s" % (pin, value))
+                logger.error(" Cannot output to pins. PWM of pin #%s would be %s" % (pin, value))
         else:
-            logging.error(" Interface not connected. Cannot output to pins. PWM of pin #%s would be %s" % (pin, value))
+            logger.error(" Interface not connected. Cannot output to pins. PWM of pin #%s would be %s" % (pin, value))
         return value
 
     def read_led(self, pin):
@@ -621,9 +614,9 @@ class LEDStrip(object):
             try:
                 value = self.iface.get_PWM_dutycycle(pin)
             except (AttributeError, IOError, pigpio.error):
-                logging.error(" Cannot read PWM of pin #%s" % (pin,))
+                logger.error(" Cannot read PWM of pin #%s" % (pin,))
         else:
-            logging.error(" Interface not connected. Cannot read PWM of pin #%s." % (pin,))
+            logger.error(" Interface not connected. Cannot read PWM of pin #%s." % (pin,))
         return value
 
     def read_rgb(self, decalibrate=False):
@@ -755,7 +748,7 @@ class LEDStrip(object):
             try:
                 r, g, b = self.colour_to_rgb_tuple(name)
             except (TypeError, IndexError, ValueError):
-                logging.info("WARNING: no colour identified by '%s'. Using current colour." % r)
+                logger.info("WARNING: no colour identified by '%s'. Using current colour." % r)
                 return self.rgb
 
         # Finally check this works
@@ -764,7 +757,7 @@ class LEDStrip(object):
             g = int(g)
             b = int(b)
         except (ValueError, TypeError):
-            logging.info("WARNING: no colour identified by '%s'. Using current colour." % r)
+            logger.info("WARNING: no colour identified by '%s'. Using current colour." % r)
             return self.rgb
 
         if fade:
@@ -808,7 +801,7 @@ class LEDStrip(object):
         if calibrate is None:  # Use auto
             calibrate = copy.copy(AUTO_CALIBRATE)
         self._calibrate = calibrate
-        logging.info("Calibration updated! %s" % self._calibrate)
+        logger.info("Calibration updated! %s" % self._calibrate)
 
     set_calibration = set_calibrate
     calibrate = set_calibrate
@@ -818,7 +811,7 @@ class LEDStrip(object):
         Turns calibration OFF
         """
         self._calibrate = copy.copy(NO_CALIBRATION)
-        logging.info("Calibration off! %s" % self._calibrate)
+        logger.info("Calibration off! %s" % self._calibrate)
 
     set_calibrate_off = calibrate_off
     set_calibration_off = calibrate_off
@@ -879,9 +872,9 @@ class LEDStrip(object):
         """
         Nukes any remaining threads. Called when the parent reactor loop stops
         """
-        logging.info("\tLEDstrip: exiting sequence threads...")
+        logger.info("\tLEDstrip: exiting sequence threads...")
         self.off()  # Stops all sequences and fades to black
-        logging.info("\t\t...done")
+        logger.info("\t\t...done")
 
     def _colour_loop(self, colours, seconds=None, milliseconds=None, fade=True):
         """
@@ -970,7 +963,7 @@ class LEDStrip(object):
             except (TypeError, ValueError):  # Means the starting temp has NOT been provided, use default
                 pass
             except KeyError:
-                logging.warning("Sunrise/sunset: Your starting colour temperature '{}' is not a valid colour temperature".format(temp_start))
+                logger.warning("Sunrise/sunset: Your starting colour temperature '{}' is not a valid colour temperature".format(temp_start))
         if temp_end:
             try:
                 _exists = NAMED_COLOURS[temp_end]
@@ -978,7 +971,7 @@ class LEDStrip(object):
             except (TypeError, ValueError):  # Means the ending temp has NOT been provided, use default
                 pass
             except KeyError:
-                logging.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
+                logger.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
 
         # print("{} > {}".format(t0,t1))
 
@@ -1006,7 +999,7 @@ class LEDStrip(object):
         # And run the loop
         t1 = time.time()
         check = True  # We only check the current values on the first run
-        for temp in xrange(temp_0, temp_n, temp_step):
+        for temp in range(temp_0, temp_n, temp_step):
             if self._sequence_stop_signal:  # Bail if sequence should stop
                 return None
             k = u"%sk" % temp
@@ -1015,7 +1008,7 @@ class LEDStrip(object):
             check = False
 
         t2 = time.time()
-        logging.info("%ss, target=%ss" % ((t2 - t1), target_time / 1000.0))
+        logger.info("%ss, target=%ss" % ((t2 - t1), target_time / 1000.0))
 
     def sunset(self, seconds=None, milliseconds=None, temp_start=None, temp_end=None):
         """
