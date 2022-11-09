@@ -21,7 +21,7 @@ import numpy as np
 from named_colours import NAMED_COLOURS
 
 import copy
-from src.config import  logger
+from src.config import logger
 import pigpio
 import re
 import six
@@ -53,7 +53,6 @@ PWM_MIN = 0.0
 #####################
 
 
-# pigpio_interface = pigpio.pi("192.168.0.33",8888) #We use ONE class instance
 def pigpiod_process():
     cmd = 'pgrep pigpiod'
 
@@ -69,9 +68,11 @@ def pigpiod_process():
         logger.info('PIGPIOD is running! PID: %s', six.ensure_text(output, "utf-8").split('\n')[0])
 
 
+# Initialise our
 pigpiod_process()
 
 
+@six.python_2_unicode_compatible
 class PiPinInterface(pigpio.pi, object):
     """
     Represents an interface to the pins on ONE Raspberry Pi. This is a lightweight python wrapper around
@@ -83,7 +84,7 @@ class PiPinInterface(pigpio.pi, object):
     def __init__(self, params):
         super(PiPinInterface, self).__init__(params['pi_host'], params['pig_port'])
 
-    def __unicode__(self):
+    def __str__(self):
         """
         Says who I am!
         """
@@ -93,9 +94,10 @@ class PiPinInterface(pigpio.pi, object):
         return "RaspberryPi Pins @ {ipv4}:{port}... {status}".format(ipv4=self._host, port=self._port, status=status)
 
     def __repr__(self):
-        return str(self.__unicode__())
+        return self.__str__()
 
 
+@six.python_2_unicode_compatible
 class LEDStrip(object):
     """
     Represents an LED strip
@@ -104,7 +106,7 @@ class LEDStrip(object):
     r = 0.0  # Current value of red channel
     g = 0.0  # Current value of green channel
     b = 0.0  # Current value of blue channel
-    colour = (0, 0, 0)  # Tuple expressing the current colour (0-255)
+    _kelvin = None  # Local cached number for colour temperature if set by a temperature
     iface = None
     _sequence = None  # The current sequence we are running
     _sequence_stop_signal = False  # Whether to stop a sequence or not
@@ -170,6 +172,12 @@ class LEDStrip(object):
 
         # Initialise strip... it may already be alive!
         self.sync_channels()  # Sets internal channels to match the values of the actual pins
+
+    def __str__(self):
+        """
+        Print current colours as unicode
+        """
+        return "{},{},{}".format(*self.rgb)
 
     @classmethod
     def lim(cls, lower=PWM_MIN, upper=PWM_MAX, value=None, less_than_lower_default=None, greater_than_upper_default=None):
@@ -255,7 +263,7 @@ class LEDStrip(object):
     @classmethod
     def kelvin_to_rgb(cls, colour_temperature):
         """
-        Converts colour temperature in kelvin into RGB
+        Converts colour temperature in kelvin into RGB. Can cope with low temperatures.
         :param colour_temperature:
         :return:
         """
@@ -319,31 +327,44 @@ class LEDStrip(object):
         return red, green, blue
 
     @classmethod
-    def rgb_to_kelvin(cls, r, g, b):
+    def rgb_to_kelvin(cls, r, g=None, b=None):
         """
-        Given a tuple of red, green, blue scaled 0-255, return the closest colour temperature in kelvin
+        Given a tuple of red, green, blue scaled 0-255, return the closest colour temperature in kelvin.
+        The hernandez1999 formula sucks for low temperatures (below 2000K).
         :param r:
         :param g:
         :param b:
         :return: <int> or <None>
         """
+        if g is None and b is None:
+            try:
+                r, g, b = r
+            except IndexError as e:
+                logger.warning(e)
+                return ""
         if six.PY2:  # the Colour library hadn't implemented the reverse lookup before moving to Python3
             return ""
         r = float(r or 0)
         g = float(g or 0)
         b = float(b or 0)
-        rgb_array = np.array([r, g, b])
-        xyz_array = colour.sRGB_to_XYZ(rgb_array / 255)
-        xy_array = colour.XYZ_to_xy(xyz_array)
-        kelvin = colour.xy_to_CCT(xy_array, 'hernandez1999')
-        return kelvin
+        try:
+            rgb_array = np.array([r, g, b])
+            xyz_array = colour.sRGB_to_XYZ(rgb_array / 255.0)
+            xy_array = colour.XYZ_to_xy(xyz_array)
+            kelvin = int(colour.xy_to_CCT(xy_array, 'hernandez1999'))
+            if kelvin < 0.0 or kelvin > 50000.00:
+                return ""
+            return kelvin
+        except ValueError:
+            pass
+        return ""
 
     RE_COLOUR_RGB = re.compile(r"(?:rgb)?\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
     RE_COLOUR_HEX_6 = re.compile(r'^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$')
     RE_COLOUR_HEX_3 = re.compile(r'^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$')
     RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
     RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
-    RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7})K", re.IGNORECASE)
+    RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7})[Kk]", re.IGNORECASE)
 
     @classmethod
     def colour_to_rgb_tuple(cls, col_str):
@@ -365,11 +386,6 @@ class LEDStrip(object):
             # First must convert single value range 0-15 to range 0-255
             return tuple(int(int(c, 16) / 15.0 * 255.0) for c in hex_3.groups())
 
-        # Might already be an RGB expression
-        rgb = cls.RE_COLOUR_RGB.search(col_str)
-        if rgb:
-            return tuple(int(c) for c in rgb.groups())  # Direct output of tuple from regex!
-
         # Might be an hsv or hs:
         hsv = cls.RE_COLOUR_HSV.search(col_str)
         if hsv:
@@ -379,6 +395,11 @@ class LEDStrip(object):
         if hs_:
             h, s = tuple(int(c) for c in hsv.groups())
             return cls.hsv_to_rgb(h, s, 255)
+
+        # Might already be an RGB expression
+        rgb = cls.RE_COLOUR_RGB.search(col_str)
+        if rgb:
+            return tuple(int(c) for c in rgb.groups())  # Direct output of tuple from regex!
 
         kelvin = cls.RE_COLOUR_KELVIN.search(col_str)
         if kelvin:
@@ -432,6 +453,7 @@ class LEDStrip(object):
         colours = copy.deepcopy(colours)  # Ensure we don't bugger up original
         if isinstance(colours, (six.text_type, six.binary_type)):
             colours = [colours]  # Listify
+        colours = list(colours)  # If anyone has passed in tuples, it can deal with those
         colours.extend(args)
         intermediate_list = []
         # Add in comma delimited stuff
@@ -480,12 +502,6 @@ class LEDStrip(object):
             out_milliseconds = minimum_milliseconds
 
         return out_milliseconds
-
-    def __unicode__(self):
-        """
-        Print current colours as unicode
-        """
-        return "{},{},{}".format(*self.rgb)
 
     def sync_channels(self):
         """
@@ -573,6 +589,20 @@ class LEDStrip(object):
         r, g, b = self.rgb
         h, s, v = self.rgb_to_hsv(r, g, b, scale_factor=255.0)
         return h, s
+
+    @property
+    def kelvin(self):
+        """
+        Return the colour temperature in kelvins
+        :return: int
+        """
+        return self._kelvin
+
+    @property
+    def kelvin_readable(self):
+        if self._kelvin is not None:
+            return "{}K".format(self._kelvin)
+        return ""
 
     def generate_new_interface(self, params):
         """
@@ -732,9 +762,18 @@ class LEDStrip(object):
         
         @keyword fade: <float> if provided, will make the colour transition smooth over the specified period of time
         """
+        # Reset any temperature stuff.
+        self._kelvin = None
+
         # Has a named colour been provided?
         if r and g is None and b is None and name is None:
             name = r
+
+        # If we bagged a kelvin, then store that for easy reporting back to the user
+        if name or hex_value:
+            kelvin_matches = self.RE_COLOUR_KELVIN.search(name or hex_value)
+            if kelvin_matches:
+                self._kelvin = int(kelvin_matches.group(1))
 
         if name:
             try:
@@ -744,9 +783,11 @@ class LEDStrip(object):
             else:
                 return self.set_hex(hex_value, fade=fade, check=check)
 
+        if name or hex_value:
             # Try our regex based resolver:
+            colour_expression = name or hex_value
             try:
-                r, g, b = self.colour_to_rgb_tuple(name)
+                r, g, b = self.colour_to_rgb_tuple(colour_expression)
             except (TypeError, IndexError, ValueError):
                 logger.info("WARNING: no colour identified by '%s'. Using current colour." % r)
                 return self.rgb
@@ -973,8 +1014,6 @@ class LEDStrip(object):
             except KeyError:
                 logger.warning("Sunrise/sunset: Your ending colour temperature '{}' is not a valid colour temperature".format(temp_end))
 
-        # print("{} > {}".format(t0,t1))
-
         if t0 > t1:
             temp_0 = int(t0)
             temp_n = int(t1)
@@ -1003,8 +1042,14 @@ class LEDStrip(object):
             if self._sequence_stop_signal:  # Bail if sequence should stop
                 return None
             k = u"%sk" % temp
-            self.fade(k, fade_time=((100 + z_factor) / (65 - x_step)), check=check)  # ms, slows down as sunset progresses
-            x_step += x_step_amount
+            try:
+                fade_time = ((100 + z_factor) / (65 - x_step))
+            except (ValueError, ZeroDivisionError):
+                x_step += x_step_amount
+                continue
+            else:
+                x_step += x_step_amount
+            self.fade(k, fade_time=fade_time, check=check)  # ms, slows down as sunset progresses
             check = False
 
         t2 = time.time()

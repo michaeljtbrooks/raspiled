@@ -4,6 +4,9 @@
     A collection of base classes and utilities for the Raspberry Pi powered elements of the Seamless project.
 """
 from __future__ import unicode_literals
+
+import re
+import unicodedata
 from collections import OrderedDict
 from copy import copy
 import json
@@ -17,7 +20,7 @@ from twisted.internet.protocol import DatagramProtocol
 from twisted.web.resource import Resource
 from twisted.web.static import File
 
-from src.config import DEBUG
+from src.config import DEBUG, logger
 
 
 RASPBERRY_PI_DIR = os.path.dirname(os.path.realpath(__file__)) #The directory we're running in
@@ -47,6 +50,20 @@ class ConfigurationError(RuntimeError):
     When someone has codged up the config
     """
     pass
+
+
+def slugify(value):
+    """
+    Cast everything to ascii, small letters.
+    :return:
+    """
+    value = (
+        unicodedata.normalize("NFKD", value)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
 class RaspberryPiWebResource(Resource):
@@ -174,6 +191,38 @@ class RaspberryPiWebResource(Resource):
     }
 
     @classmethod
+    def outcome(cls, action="", successful=True, message="", message_args=None, message_kwargs=None):
+        """
+        Generates a dict for passing to the information context builder for returning to the user.
+        :param action: <str> The action that was just run (normalised name)
+        :param successful: <Bool> If this call passed without error
+        :param message: <str> The message to send back to the browser in the JSON response.
+        :param message_args:
+        :param message_kwargs:
+        :return: {} Dict to flush into context
+        """
+        message_args = message_args or []
+        message_kwargs = message_kwargs or {}
+        try:
+            built_message = six.text_type(message).format(*message_args, **message_kwargs)
+        except KeyError:
+            logger.error("Outcome message missing correct number of args / kwargs: \n'%s':\n\tArgs: %s\n\tKwargs: %s", message, message_args, message_kwargs)
+            built_message = message
+        if not successful:
+            logger.warning(built_message)
+            return {
+                "action": action,
+                "success": False,
+                "error": built_message or True
+            }
+        logger.info(built_message)
+        return {
+            "action": action,
+            "success": built_message or True,
+            "error": False
+        }
+
+    @classmethod
     def render_json(cls, request, context=None, http_code=200):
         """
         Renders a context object into JSON
@@ -199,7 +248,8 @@ class RaspberryPiWebResource(Resource):
         :return: rendered valid JSON in utf8
         """
         status = self.information__status(request)
-        print("Status: {}".format(status))
+        if DEBUG:
+            print("Status: {}".format(status))
         original_context = copy(context)
         real_context = OrderedDict()
         try:
@@ -227,7 +277,7 @@ class RaspberryPiWebResource(Resource):
 
         request.setHeader("Content-Type", "text/html; charset=utf-8")
         request.setResponseCode(http_code)
-        htmlstr = ""
+
         template_file_path = os.path.join(RASPBERRY_PI_DIR, "templates", template)
 
         with open(template_file_path) as html_template:
@@ -271,15 +321,31 @@ class RaspberryPiWebResource(Resource):
         for key_name, information_name in self.PARAM_TO_INFORMATION_MAPPING:
             if request.has_param(key_name) or clean_path == key_name:
                 func_name = "information__%s" % information_name
-                output_context = getattr(self, func_name)(request)
+                try:
+                    output_context = getattr(self, func_name)(request)
+                except Exception as e:
+                    output_context = self.outcome(
+                        action=information_name,
+                        successful=False,
+                        message="{}: {}".format(e.__class__.__name__, e)
+                    )
+                    logger.exception(e)
                 return self.render_json(request, context=output_context)
 
         # Next see if we're being asked for an action resource
-        for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:
+        for key_name, action_name in self.PARAM_TO_ACTION_MAPPING:  # This gets set on child classes
             if request.has_param(key_name) or clean_path == key_name:
                 self.before_action(action_name)  # Inheriting classes can do stuff before the action
                 func_name = "action__%s" % action_name
-                output_context = getattr(self, func_name)(request)  # The actual action
+                try:
+                    output_context = getattr(self, func_name)(request)
+                except Exception as e:
+                    output_context = self.outcome(
+                        action=action_name,
+                        successful=False,
+                        message="{}: {}".format(e.__class__.__name__, e)
+                    )
+                    logger.exception(e)
                 self.after_action(action_name)  # Inheriting classes can do stuff after the action
                 return self.render_json_with_status(request, context=output_context)
 

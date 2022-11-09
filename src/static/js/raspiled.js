@@ -20,7 +20,8 @@ function debounce(func, wait, immediate) {
         timeout = setTimeout(later, wait);
         if (callNow) func.apply(context, args);
     };
-};
+}
+
 function init_colourpicker(current_hex){
 	//Initialises the colourpicker to the specified colour, or black
 	current_hex = current_hex || "#000000";
@@ -61,7 +62,16 @@ function init_colourpicker(current_hex){
 	                success: function(data){
 	                    $wheel_saturation.prop("fill", "url(#iroGradient0)")
                         $wheel_saturation.attr("fill", "url(#iroGradient0)")
-	                	update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], false)
+	                	update_current_colour(
+                            data["current_hex"],
+                            data["current_rgb_readable"] || data["current_rgb"],
+                            data["contrast"],
+                            false,
+                            false,
+                            "",
+                            data["contrast"],  // Foreground
+                            data["current_hex"]  // Background
+                        )
 	                },
 	                dataType: "json"
 	            }),
@@ -77,28 +87,43 @@ $.fn.extend({
 });
 
 //Update the colour wheel
-function update_current_colour(current, current_rgb, contrast, is_preset, sequence_name){
+function update_current_colour(current_hex, current_rgb_readable, contrast, is_preset, is_sequence, preset_or_sequence_name, foreground, background){
 	//Updates the UI to show the specified colour
 	is_preset = is_preset || false;
-	sequence_name = sequence_name || null;
+	preset_or_sequence_name = preset_or_sequence_name || null;
+    foreground = foreground || contrast;
+    background = background || current_hex;
 	
 	//Colour label first
 	var $current_colour_board = $("#current-colour");
-    $current_colour_board.css("color",contrast);
-    $current_colour_board.css("background-color", current);
-    if(sequence_name){
-	    $current_colour_board.html(sequence_name);
+    if(is_sequence){
+        $current_colour_board.css("color", foreground);
+        $current_colour_board.css("text-shadow", "2px 2px 2px #000000");
+        $current_colour_board.css("background-color", "");
+        $current_colour_board.css("background", background);
+    }else {
+        $current_colour_board.css("color", foreground);
+        $current_colour_board.css("text-shadow", "0 0 black");
+        $current_colour_board.css("background", "");
+        $current_colour_board.css("background-color", background);
+    }
+    if(preset_or_sequence_name){
+        if(is_sequence) {
+            $current_colour_board.html(preset_or_sequence_name);
+        } else {
+            $current_colour_board.html(preset_or_sequence_name + " " + current_rgb_readable);
+        }
     } else {
-        $current_colour_board.html(current + " " + current_rgb);
+        $current_colour_board.html(current_hex + " " + current_rgb_readable);
     }
 
     //Now the colour wheel (we suppress this so we don't fire off a "set" ajax call:
 	if(is_preset){ //Only need to move the wheel if its not a preset
 	    $.colour_picker.suppress_set = true;
-        if(sequence_name){
+        if(is_sequence){
             $.colour_picker.color.hexString = "#FFFFFF";
         } else {
-            $.colour_picker.color.hexString = current;
+            $.colour_picker.color.hexString = current_hex;
         }
 		$.colour_picker.suppress_set = false;
 	}
@@ -108,7 +133,6 @@ function update_current_colour(current, current_rgb, contrast, is_preset, sequen
 $.fn.activate_presets = function(){
     $(document).on("click", ".select_preset", function(e){
 		var $picker_button = $(this);
-		var $current_colour_board = $("#current-colour");
 		var querystring = $picker_button.data("qs");
         var colorstring = $picker_button.data("color");
 		var is_sequence = $picker_button.data("sequence");
@@ -122,12 +146,34 @@ $.fn.activate_presets = function(){
                     console.log(data);
                     if(is_sequence){
                         // Is a sequence. So set the wheel to show the gradient of the preset:
-                        update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true, $picker_button.text())
+                        let foreground = $picker_button.css("color") || data["contrast"];
+                        let background = $picker_button.css("background") || data["current_hex"];
+                        update_current_colour(
+                            data["current_hex"],
+                            data["current_rgb"],
+                            data["contrast"],
+                            true,
+                            true,
+                            $picker_button.text(),
+                            foreground,
+                            background
+                        )
                     } else {
                         // Not a sequence, so fill with the usual gradient and select the colour
-                        $wheel_saturation.prop("fill", "url(#iroGradient0)")
-                        $wheel_saturation.attr("fill", "url(#iroGradient0)")
-                        update_current_colour(data["current_hex"], data["current_rgb"], data["contrast"], true, false)
+                        $wheel_saturation.prop("fill", "url(#iroGradient0)");
+                        $wheel_saturation.attr("fill", "url(#iroGradient0)");
+                        let foreground = $picker_button.css("color") || data["contrast"];
+                        let background = $picker_button.css("background-color") || data["current_hex"];
+                        update_current_colour(
+                            data["current_hex"],
+                            data["current_rgb_readable"] || data["current_rgb"],
+                            $picker_button.css("color") || data["contrast"],
+                            true,
+                            false,
+                            $picker_button.text(),
+                            foreground,
+                            background
+                        )
                     }
                 },
                 error: function(data){
