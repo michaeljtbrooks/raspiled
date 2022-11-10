@@ -20,3 +20,6 @@
 .whitelist
 .project
 .pydevproject
+*.log
+*.ffs
+
