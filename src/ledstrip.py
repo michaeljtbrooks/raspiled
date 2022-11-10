@@ -355,7 +355,7 @@ class LEDStrip(object):
         if hsv:
             h, s, v = tuple(int(c) for c in hsv.groups())
             return cls.hsv_to_rgb(h, s, v)
-        hs_ = cls.RE_COLOUR_HSV.search(col_str)
+        hs_ = cls.RE_COLOUR_HS.search(col_str)
         if hs_:
             h, s = tuple(int(c) for c in hs_.groups())
             return cls.hsv_to_rgb(h, s, 255)
