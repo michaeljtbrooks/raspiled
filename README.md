@@ -57,7 +57,7 @@ You don't need a heatsink for the MOSFETs, unless your house happens to be hotte
 ### Software Installation ###
 1. Get Raspian or Ubuntu running on your Raspberry Pi, with network connectivity working, and install essential packages:
 ```bash
-sudo apt-get install build-essential unzip wget git
+sudo apt-get install build-essential unzip wget git python3-dev liblapack-dev libatlas-base-dev
 ```
 2. Install pigpio (see http://abyz.me.uk/rpi/pigpio/download.html)
 ```bash
@@ -71,13 +71,13 @@ sudo make install
 4. SSH into your Raspberry Pi. Change to the directory where you saved this repo
 5. Install python virtual environments
 ```bash
-sudo apt-get install python-pip 
-sudo pip install virtualenv
+sudo apt-get install python-pip
+sudo pip3 install venv
 ```
 6. Create a virtual environment to run Raspiled in, and activate it
 ```bash
-virtualenv ./
-source ./bin/activate
+python3 -m venv ./venv
+source ./venv/bin/activate
 ```
 7. Install this repo's dependencies (may take 1- mins on a Raspberry Pi
 ```bash
@@ -102,11 +102,11 @@ python ./src/raspiled_listener.py
 ##### Optional stuff #####
 If you want the Raspberry Pi to boot up and automatically run Raspiled, you can add this command to /etc/rc.local:
 ```bash
-/path/to/your/virtualenv/python /path/to/your/raspiled/src/raspiled_listener.py
+/path/to/your/virtualenv/python3 /path/to/your/raspiled/src/raspiled_listener.py
 ```
 Use absolute paths. e.g. assuming you put Raspiled into the /opt directory:
 ```bash
-   /opt/raspiled/bin/activate/python  /opt/raspiled/src/raspiled_listener.py
+   /opt/raspiled/venv/bin/activate/python  /opt/raspiled/src/raspiled_listener.py
 ```
 
 ### Web Interface ###

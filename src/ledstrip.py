@@ -15,9 +15,6 @@ from __future__ import unicode_literals
 import colorsys
 import math
 
-import colour
-import numpy as np
-
 from named_colours import NAMED_COLOURS
 
 import copy
@@ -325,39 +322,6 @@ class LEDStrip(object):
                 blue = tmp_blue
 
         return red, green, blue
-
-    @classmethod
-    def rgb_to_kelvin(cls, r, g=None, b=None):
-        """
-        Given a tuple of red, green, blue scaled 0-255, return the closest colour temperature in kelvin.
-        The hernandez1999 formula sucks for low temperatures (below 2000K).
-        :param r:
-        :param g:
-        :param b:
-        :return: <int> or <None>
-        """
-        if g is None and b is None:
-            try:
-                r, g, b = r
-            except IndexError as e:
-                logger.warning(e)
-                return ""
-        if six.PY2:  # the Colour library hadn't implemented the reverse lookup before moving to Python3
-            return ""
-        r = float(r or 0)
-        g = float(g or 0)
-        b = float(b or 0)
-        try:
-            rgb_array = np.array([r, g, b])
-            xyz_array = colour.sRGB_to_XYZ(rgb_array / 255.0)
-            xy_array = colour.XYZ_to_xy(xyz_array)
-            kelvin = int(colour.xy_to_CCT(xy_array, 'hernandez1999'))
-            if kelvin < 0.0 or kelvin > 50000.00:
-                return ""
-            return kelvin
-        except ValueError:
-            pass
-        return ""
 
     RE_COLOUR_RGB = re.compile(r"(?:rgb)?\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
     RE_COLOUR_HEX_6 = re.compile(r'^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$')

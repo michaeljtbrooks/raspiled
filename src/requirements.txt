@@ -1,10 +1,9 @@
 backports.shutil-get-terminal-size==1.0.0
 decorator==4.3.0
 enum34==1.1.6
-ipython==5.6.0
+ipython
 ipython-genutils==0.2.0
 numpy
-colour-science
 pathlib2==2.3.0
 pexpect==4.5.0
 pickleshare==0.7.4
