@@ -235,27 +235,33 @@ class LEDStrip(object):
         return '#%02x%02x%02x' % (int(r), int(g), int(b))
 
     @classmethod
-    def hsv_to_rgb(cls, hue, saturation, value=255, scale_factor=255.0):
+    def hsv_to_rgb(cls, hue, saturation, value=100.0, hue_scale_factor=360.0, sat_scale_factor=100.0, val_scale_factor=100.0):
         """
         Convert hue and saturation to RGB. Value is optional and is set at 255 when omitted
         :param hue:
         :param saturation:
         :param value:
-        :param scale_factor: What to scale the normally 0-1 colorsys space to
+        :param hue_scale_factor: Hue range scale. Colorsys needs 0-1. Typically this will be 0-255 or degrees (0-360)
+        :param sat_scale_factor: Saturation range scale. Colorsys needs 0-1. Typically this will be 0-255 or percent (0-100)
+        :param val_scale_factor: Saturation range scale. Colorsys needs 0-1. Typically this will be 0-255 or percent (0-100)
         :return:
         """
-        scale_factor = float(scale_factor)
-        r, g, b = colorsys.hsv_to_rgb(hue/scale_factor, saturation/scale_factor, value/scale_factor)
-        return int(round(r*scale_factor)), int(round(g*scale_factor)), int(round(b*scale_factor)),
+        hue_scale_factor = float(hue_scale_factor)
+        sat_scale_factor = float(sat_scale_factor)
+        val_scale_factor = float(val_scale_factor)
+        r, g, b = colorsys.hsv_to_rgb(hue/hue_scale_factor, saturation/sat_scale_factor, value/val_scale_factor)
+        return int(round(r*255.0)), int(round(g*255.0)), int(round(b*255.0)),
 
     @classmethod
-    def rgb_to_hsv(cls, red, green, blue, scale_factor=255.0):
+    def rgb_to_hsv(cls, red, green, blue, hue_scale_factor=360.0, sat_scale_factor=100.0, val_scale_factor=100.0):
         """
         Convert red, green, blue to HSV
         """
-        scale_factor = float(scale_factor)
-        h, s, v = colorsys.rgb_to_hsv(red/scale_factor, green/scale_factor, blue/scale_factor)
-        return int(round(h * scale_factor)), int(round(s * scale_factor)), int(round(v * scale_factor)),
+        hue_scale_factor = float(hue_scale_factor)
+        sat_scale_factor = float(sat_scale_factor)
+        val_scale_factor = float(val_scale_factor)
+        h, s, v = colorsys.rgb_to_hsv(red/255.0, green/255.0, blue/255.0)
+        return int(round(h * hue_scale_factor)), int(round(s * sat_scale_factor)), int(round(v * val_scale_factor)),
 
     @classmethod
     def kelvin_to_rgb(cls, colour_temperature):
@@ -267,7 +273,7 @@ class LEDStrip(object):
         if isinstance(colour_temperature, (six.text_type, six.binary_type)):
             colour_temperature = six.u(colour_temperature)
             colour_temperature = colour_temperature.strip(" ").strip("K")
-        colour_temperature = int(colour_temperature)  # May raise ValueError
+        colour_temperature = round(float(colour_temperature))  # May raise ValueError
 
         # range check
         if colour_temperature < 1000:
@@ -326,9 +332,9 @@ class LEDStrip(object):
     RE_COLOUR_RGB = re.compile(r"(?:rgb)?\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
     RE_COLOUR_HEX_6 = re.compile(r'^#?([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$')
     RE_COLOUR_HEX_3 = re.compile(r'^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$')
-    RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
-    RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3})[,_-]\s?([0-9]{1,3})\)?", re.IGNORECASE)
-    RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7})[Kk]", re.IGNORECASE)
+    RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
+    RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
+    RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7}(?:\.[0-9]+)?)[Kk]", re.IGNORECASE)
 
     @classmethod
     def colour_to_rgb_tuple(cls, col_str):
@@ -339,7 +345,7 @@ class LEDStrip(object):
         
         @return: <tuple> (r,g,b) component values converted into base 10 integers in range (0-255)
         """
-
+        six.ensure_text(col_str)
         # Might be a hex expression
         hex_6 = cls.RE_COLOUR_HEX_6.search(col_str)
         if hex_6:
@@ -353,12 +359,12 @@ class LEDStrip(object):
         # Might be an hsv or hs:
         hsv = cls.RE_COLOUR_HSV.search(col_str)
         if hsv:
-            h, s, v = tuple(int(c) for c in hsv.groups())
+            h, s, v = tuple(float(c) for c in hsv.groups())
             return cls.hsv_to_rgb(h, s, v)
         hs_ = cls.RE_COLOUR_HS.search(col_str)
         if hs_:
-            h, s = tuple(int(c) for c in hs_.groups())
-            return cls.hsv_to_rgb(h, s, 255)
+            h, s = tuple(float(c) for c in hs_.groups())
+            return cls.hsv_to_rgb(h, s, 100)
 
         # Might already be an RGB expression
         rgb = cls.RE_COLOUR_RGB.search(col_str)
@@ -367,7 +373,7 @@ class LEDStrip(object):
 
         kelvin = cls.RE_COLOUR_KELVIN.search(col_str)
         if kelvin:
-            temp_k = int(kelvin.group(1))
+            temp_k = float(kelvin.group(1))
             return cls.kelvin_to_rgb(colour_temperature=temp_k)
 
         return None  # Otherwise canny do i' captain
@@ -543,7 +549,7 @@ class LEDStrip(object):
         Calibration-adjusted hsv value
         """
         r, g, b = self.rgb
-        return self.rgb_to_hsv(r, g, b, scale_factor=255.0)
+        return self.rgb_to_hsv(r, g, b)
 
     @property
     def hs(self):
@@ -551,7 +557,7 @@ class LEDStrip(object):
         Calibration-adjusted hsv value
         """
         r, g, b = self.rgb
-        h, s, v = self.rgb_to_hsv(r, g, b, scale_factor=255.0)
+        h, s, v = self.rgb_to_hsv(r, g, b)
         return h, s
 
     @property
@@ -737,7 +743,7 @@ class LEDStrip(object):
         if name or hex_value:
             kelvin_matches = self.RE_COLOUR_KELVIN.search(name or hex_value)
             if kelvin_matches:
-                self._kelvin = int(kelvin_matches.group(1))
+                self._kelvin = round(float(kelvin_matches.group(1)))
 
         if name:
             try:
@@ -752,8 +758,8 @@ class LEDStrip(object):
             colour_expression = name or hex_value
             try:
                 r, g, b = self.colour_to_rgb_tuple(colour_expression)
-            except (TypeError, IndexError, ValueError):
-                logger.info("WARNING: no colour identified by '%s'. Using current colour." % r)
+            except (TypeError, IndexError, ValueError) as e:
+                logger.info("WARNING: no colour identified by '%s'. Using current colour. (%s: %s)", r, e.__class__.__name__, e)
                 return self.rgb
 
         # Finally check this works
@@ -761,8 +767,8 @@ class LEDStrip(object):
             r = int(r)
             g = int(g)
             b = int(b)
-        except (ValueError, TypeError):
-            logger.info("WARNING: no colour identified by '%s'. Using current colour." % r)
+        except (ValueError, TypeError) as e:
+            logger.info("WARNING: no colour identified by '%s'. Using current colour. (%s: %s)", r, e.__class__.__name__, e)
             return self.rgb
 
         if fade:
