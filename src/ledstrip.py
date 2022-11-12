@@ -334,7 +334,7 @@ class LEDStrip(object):
     RE_COLOUR_HEX_3 = re.compile(r'^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$')
     RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
     RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
-    RE_COLOUR_BRIGHTNESS = re.compile(r"[vbVB]?\(?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
+    RE_COLOUR_BRIGHTNESS = re.compile(r"[vbVB]\(?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
     RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7}(?:\.[0-9]+)?)[Kk]", re.IGNORECASE)
 
     @classmethod
