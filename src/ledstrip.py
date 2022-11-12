@@ -334,14 +334,16 @@ class LEDStrip(object):
     RE_COLOUR_HEX_3 = re.compile(r'^#?([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$')
     RE_COLOUR_HSV = re.compile(r"hsv\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
     RE_COLOUR_HS = re.compile(r"hs\(?([0-9]{1,3}(?:\.[0-9]+)?)[,_-]\s?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
+    RE_COLOUR_BRIGHTNESS = re.compile(r"[vbVB]?\(?([0-9]{1,3}(?:\.[0-9]+)?)\)?", re.IGNORECASE)
     RE_COLOUR_KELVIN = re.compile(r"([0-9]{1,7}(?:\.[0-9]+)?)[Kk]", re.IGNORECASE)
 
     @classmethod
-    def colour_to_rgb_tuple(cls, col_str):
+    def colour_to_rgb_tuple(cls, col_str, current_rgb=None):
         """
         Converts a colour string to an RGB tuple
         
         @param col_str: <str> a hex or RGB html colour
+        @param current_rgb: <tuple> The current colour, used to fill in any missing values in hsv setting.
         
         @return: <tuple> (r,g,b) component values converted into base 10 integers in range (0-255)
         """
@@ -361,10 +363,23 @@ class LEDStrip(object):
         if hsv:
             h, s, v = tuple(float(c) for c in hsv.groups())
             return cls.hsv_to_rgb(h, s, v)
+        # Partial HSV operations require knowledge of current value:
+        current_value = 100
+        current_hue = 360
+        current_saturation = 0
+        if current_rgb:
+            try:
+                current_hue, current_saturation, current_value = cls.rgb_to_hsv(red=current_rgb[0], green=current_rgb[1], blue=current_rgb[2])
+            except IndexError:
+                pass
         hs_ = cls.RE_COLOUR_HS.search(col_str)
         if hs_:
             h, s = tuple(float(c) for c in hs_.groups())
-            return cls.hsv_to_rgb(h, s, 100)
+            return cls.hsv_to_rgb(h, s, current_value)
+        brightness = cls.RE_COLOUR_BRIGHTNESS.search(col_str)
+        if brightness:
+            new_value = float(brightness.group(1))
+            return cls.hsv_to_rgb(current_hue, current_saturation, new_value)
 
         # Might already be an RGB expression
         rgb = cls.RE_COLOUR_RGB.search(col_str)
@@ -757,7 +772,7 @@ class LEDStrip(object):
             # Try our regex based resolver:
             colour_expression = name or hex_value
             try:
-                r, g, b = self.colour_to_rgb_tuple(colour_expression)
+                r, g, b = self.colour_to_rgb_tuple(colour_expression, self.rgb)
             except (TypeError, IndexError, ValueError) as e:
                 logger.info("WARNING: no colour identified by '%s'. Using current colour. (%s: %s)", r, e.__class__.__name__, e)
                 return self.rgb
@@ -851,7 +866,7 @@ class LEDStrip(object):
         Initiates a sequence in a separate non-blocking thread.
         Ensures any existing sequences are killed
         
-        @param sequence: Method on LEDStrip to run
+        @param func: Method on LEDStrip to run
         @args @kwargs: passed to sequence.run() on calling sequence.start()
         """
         self.stop_current_sequence()
@@ -955,7 +970,6 @@ class LEDStrip(object):
         @keyword milliseconds: <float> Number of milliseconds to do the sequence over, gets added to seconds if both provided
         @keyword temp_start: <unicode> A colour temperature (in Kelvin) to start the sequence from
         @keyword temp_end: <unicode> A colour temperature (in Kelvin) to end the sequence at
-        @keyword fade: <Boolean> whether to fade between steps (True) or jump (False)
         """
 
         # Work out what the defaults should be
