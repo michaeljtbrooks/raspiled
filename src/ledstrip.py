@@ -13,6 +13,7 @@
 from __future__ import unicode_literals
 
 import colorsys
+from html import unescape
 import math
 
 from named_colours import NAMED_COLOURS
@@ -26,7 +27,6 @@ import subprocess
 import time
 from time import sleep
 import threading
-from six.moves.html_parser import HTMLParser
 
 
 ##### Constants #####
@@ -442,10 +442,9 @@ class LEDStrip(object):
         colours.extend(args)
         intermediate_list = []
         # Add in comma delimited stuff
-        h = HTMLParser()
         for colour_term in colours:
             if isinstance(colour_term, (six.text_type, six.binary_type)):
-                colour_term_decoded = h.unescape(colour_term)  # HTML char decode
+                colour_term_decoded = unescape(colour_term)  # HTML char decode
                 colour_terms_list = colour_term_decoded.split(",")
                 intermediate_list.extend(colour_terms_list)
             else:
